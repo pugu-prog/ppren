@@ -2615,3 +2615,58 @@ function seedRichtegSchuelerSept2026() {
   Logger.log("✅ " + resultat.length + " Schüler ugeluecht:\n" + JSON.stringify(resultat, null, 2));
   return resultat;
 }
+
+/**
+ * Eemoleg Opraum-Funktioun: virun der Matrikel-Ëmstellung hat d'Personen-
+ * Sheet e falscht Format (6 Kolonnen: Numm, Rolle, Klasse, Email, Aktiv,
+ * Untis-Code). Duerno gouf op 7 Kolonnen ëmgestallt (LoginId, Virnumm,
+ * Numm, Rolle, Klasse, Email, Aktiv), mä al Zeilen goufen NET ëmgeschriwwen.
+ * Dës Funktioun fënnt esou al Zeilen (erkannt drun, datt Kolonn D net
+ * "Schüler" oder "Prof" ass) a behandelt se sou:
+ *  - Al Prof-Zeil (Roll stoung a Kolonn B): gëtt an d'nei Format
+ *    ëmgeschriwwen, LoginId/Numm/Email bleiwen erhalen (Login-Zougang
+ *    onberuehrt).
+ *  - Al Test-Schüler-Zeil: gëtt komplett geläscht (Numm ass duerch déi
+ *    richteg Matrikel-Schüler ersat), zesumme mat der entspriechender
+ *    Login-Zeil.
+ * Just eemol lafen, duerno kann dës Funktioun ignoréiert ginn.
+ */
+function raeumAlFormatPersonenOp() {
+  const personenSheet = getPersonenSheet();
+  const loginSheet = getLoginSheet();
+  const werte = personenSheet.getDataRange().getValues();
+  const geläschtNimm = [];
+  const ëmgeschriwwen = [];
+
+  for (let i = werte.length - 1; i >= 1; i--) {
+    const z = werte[i];
+    const roleSpaltD = z[3]; // nei Positioun fir "Rolle"
+    if (roleSpaltD === "Schüler" || roleSpaltD === "Prof") continue; // scho nei Format
+
+    // Al Format: [Numm, Rolle, Klasse, Email, Aktiv, UntisCode]
+    const alNumm = z[0];
+    const alRolle = z[1];
+    const alEmail = z[3];
+    const alAktiv = z[4];
+
+    if (alRolle === "Prof") {
+      personenSheet.getRange(i + 1, 1, 1, 7).setValues([[alNumm, "", alNumm, "Prof", "", alEmail || "", alAktiv === "Nee" ? "Nee" : "Jo"]]);
+      ëmgeschriwwen.push(alNumm);
+    } else if (alRolle === "Schüler") {
+      personenSheet.deleteRow(i + 1);
+      geläschtNimm.push(alNumm);
+    } else {
+      Logger.log("⚠️ Onbekannt al Zeil (net ëmgeschriwwen, net geläscht): " + JSON.stringify(z));
+    }
+  }
+
+  if (geläschtNimm.length > 0) {
+    const loginWerte = loginSheet.getDataRange().getValues();
+    for (let i = loginWerte.length - 1; i >= 1; i--) {
+      if (geläschtNimm.includes(loginWerte[i][0])) loginSheet.deleteRow(i + 1);
+    }
+  }
+
+  Logger.log("✅ Opraum fäerdeg. Ëmgeschriwwen (Prof): " + JSON.stringify(ëmgeschriwwen) + ". Geläscht (al Test-Schüler): " + JSON.stringify(geläschtNimm));
+  return { ëmgeschriwwen, geläschtNimm };
+}
