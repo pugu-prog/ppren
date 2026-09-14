@@ -25,16 +25,16 @@
 <script type="text/babel">
 const { useState, useEffect, useMemo } = React;
 
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyGIQYHX9oUltGK9KCCIHmvidsF2BcSInO4iDE9tTjj9DQoTpRgiKsRjdyab-DtnCM/exec";
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
 
 // Lëtzebuerger Schoulvakanzen a Feierdeeg fir d'Schouljoer 2026/2027 (Quell: men.public.lu)
 const VAKANZEN_2026_27 = [
-  { start: "2026-10-31", end: "2026-11-08", label: "Allerheiligenferien" },
-  { start: "2026-12-19", end: "2027-01-03", label: "Chreschtvakanz" },
-  { start: "2027-02-06", end: "2027-02-14", label: "Karénervakanz" },
-  { start: "2027-03-27", end: "2027-04-11", label: "Ouschterferien" },
-  { start: "2027-05-29", end: "2027-06-06", label: "Pengschtferien" },
-  { start: "2027-07-16", end: "2027-09-14", label: "Summerferien" },
+  { start: "2026-10-31", end: "2026-11-08", label: "Allerhellgevakanz" },
+  { start: "2026-12-19", end: "2027-01-03", label: "Chrëschtvakanz" },
+  { start: "2027-02-06", end: "2027-02-14", label: "Fuesvakanz" },
+  { start: "2027-03-27", end: "2027-04-11", label: "Ouschtervakanz" },
+  { start: "2027-05-29", end: "2027-06-06", label: "Pengschtvakanz" },
+  { start: "2027-07-16", end: "2027-09-14", label: "Summervakanz" },
 ];
 const FEIERDEEG_2026_27 = [
   { datum: "2027-05-01", label: "Gesetzleche Feierdag (1. Mee)" },
