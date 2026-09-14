@@ -47,7 +47,7 @@
 
   /** Mellt of: läscht d'Session um Server, réimt localStorage of, leet op login.html. */
   window.ppRenOfmellen = function () {
-    const WEB_APP_URL_LOGOUT = "https://script.google.com/macros/s/AKfycbyGIQYHX9oUltGK9KCCIHmvidsF2BcSInO4iDE9tTjj9DQoTpRgiKsRjdyab-DtnCM/exec";
+    const WEB_APP_URL_LOGOUT = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
     fetch(WEB_APP_URL_LOGOUT, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -89,7 +89,7 @@
   // hei driwwer baséiert nëmmen op localStorage, dat kann ëmgeängt ginn (z.B. iwwer
   // DevTools). Dofir gëtt d'Roll hei mat der Server-Äntwert ofgeglach a lokal
   // korrigéiert/geläscht, wann se net iwwerteneestëmmen.
-  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyGIQYHX9oUltGK9KCCIHmvidsF2BcSInO4iDE9tTjj9DQoTpRgiKsRjdyab-DtnCM/exec";
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
   fetch(WEB_APP_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
