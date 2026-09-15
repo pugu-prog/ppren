@@ -43,7 +43,7 @@ async function sendeAnGoogleDrive(payload) {
   });
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "Unbekannter Fehler");
-  return data.url;
+  return data;
 }
 
 const emptyPlan = () => ({
@@ -141,6 +141,7 @@ function App() {
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState(null);
   const [docUrl, setDocUrl] = useState(null);
+  const [docPdfUrl, setDocPdfUrl] = useState(null);
   const [msSyncInfo, setMsSyncInfo] = useState(null);
 
   const storageKey = schuelerId ? `projektplan:${schuelerId}` : null;
@@ -235,8 +236,9 @@ function App() {
     setSyncing(true);
     setSyncError(null);
     try {
-      const url = await sendeAnGoogleDrive(buildPayload(status));
-      setDocUrl(url);
+      const resultat = await sendeAnGoogleDrive(buildPayload(status));
+      setDocUrl(resultat.url);
+      setDocPdfUrl(resultat.pdfUrl || null);
       setToast(status.startsWith("Frei") ? "Freigegeben. Gesperrt und mit Google Drive/Suivi synchronisiert." : "Projektplan eingereicht und mit Google Drive synchronisiert.");
     } catch (e) {
       setSyncError("Konnte nicht mit Google Drive synchronisieren: " + e.message);
@@ -254,6 +256,7 @@ function App() {
     localStorage.removeItem(`projektplan:${schuelerId}`);
     setPlan(emptyPlan());
     setDocUrl(null);
+    setDocPdfUrl(null);
   };
   const locked = plan.status === "Freigegeben & digital unterschrieben";
 
@@ -439,7 +442,8 @@ function App() {
                   </span>
                 )}
                 {locked && <span className="locked-note">🔒 Gesperrt — freigegeben und ins Suivi übernommen.</span>}
-                {docUrl && <a className="doc-link" href={docUrl} target="_blank" rel="noreferrer">📄 Google Doc öffnen ↗</a>}
+                {docUrl && <a className="doc-link" href={docUrl} target="_blank" rel="noreferrer">📄 Word öffnen ↗</a>}
+                {docPdfUrl && <a className="doc-link" href={docPdfUrl} target="_blank" rel="noreferrer">📕 PDF öffnen ↗</a>}
               </div>
               {syncError && <div className="sync-error">{syncError}</div>}
             </>
