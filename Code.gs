@@ -513,7 +513,7 @@ function notifizéierBetreuerNeierBericht(schueler, betreuerListe, woche) {
         to: email,
         subject: "PPREN: Neien Wochenbericht vun " + schueler + " (" + woche + ")",
         body: schueler + " huet e Wochenbericht fir d'Woch " + woche + " ofginn.\n\n" +
-          "Hei korrigéieren: https://pugu-prog.github.io/ppren-projektplan/wochenberichte-korrigeieren.html",
+          "Hei korrigéieren: https://pugu-prog.github.io/ppren/wochenberichte-korrigeieren.html",
       });
     } catch (e) { }
   });
@@ -1339,7 +1339,7 @@ function sendeErennerungen() {
         subject: "PPREN: Wochenbericht net vergiessen (haut Owend 22.00h zou)",
         body: "Hallo " + (s.virnumm || "") + ",\n\nDu hues fir dës Woch (" + woche + ") nach kee Wochenbericht ofginn. " +
           "D'Ofgab ass haut Owend um 22.00h — duerno gëtt automatesch 0 Punkte gesat.\n\n" +
-          "Hei ofginn: https://pugu-prog.github.io/ppren-projektplan/wochenbericht.html",
+          "Hei ofginn: https://pugu-prog.github.io/ppren/wochenbericht.html",
       });
     } catch (e) { }
   });
@@ -1560,8 +1560,8 @@ function fuegeFarbBalkenEin(body, farbe, hoehePt, breitePt) {
   zelle.setPaddingTop(0).setPaddingBottom(0).setPaddingLeft(0).setPaddingRight(0);
 }
 
-const LTETT_LOGO_URL = "https://raw.githubusercontent.com/pugu-prog/ppren-projektplan/main/LTEtt_Logo.png";
-const SE_LOGO_URL = "https://raw.githubusercontent.com/pugu-prog/ppren-projektplan/main/LogoSE_weisHintergrund.png";
+const LTETT_LOGO_URL = "https://raw.githubusercontent.com/pugu-prog/ppren/main/LTEtt_Logo.png";
+const SE_LOGO_URL = "https://raw.githubusercontent.com/pugu-prog/ppren/main/LogoSE_weisHintergrund.png";
 
 function erstelleDeckblattBildViaSlides(dokumentTyp, data, behalten) {
   const PAGE_W = 595, PAGE_H = 842;
