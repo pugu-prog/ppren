@@ -2670,3 +2670,64 @@ function raeumAlFormatPersonenOp() {
   Logger.log("✅ Opraum fäerdeg. Ëmgeschriwwen (Prof): " + JSON.stringify(ëmgeschriwwen) + ". Geläscht (al Test-Schüler): " + JSON.stringify(geläschtNimm));
   return { ëmgeschriwwen, geläschtNimm };
 }
+
+/**
+ * ===== Backup-System =====
+ * Erstellt all Woch eng komplett Kopie vum ganzen Übersicht-Spreadsheet
+ * (all Tabs: Übersicht, Personen, Login, Sessions, Bewertungen, asw.) an
+ * engem separaten "Backups"-Ordner op Drive — onofhängeg vun der
+ * Google-Sheets-Versiounshistorique, déi zwar all Ännerung protokolléiert,
+ * awer keen richtegt Backup ass (alles bleift am selwechte Fichier).
+ *
+ * BEHALEN_ANZUEL_WOCHEN gëtt un, wéi vill al Backups behale ginn, ier déi
+ * eelst automatesch geläscht ginn (fir de Speicherplaz net onendlech
+ * unzewuessen).
+ */
+const BACKUP_BEHALEN_ANZUEL = 10;
+
+function getBackupOrdner() {
+  const hauptordner = DriveApp.getFolderById(FOLDER_ID);
+  const bestehend = hauptordner.getFoldersByName("Backups");
+  if (bestehend.hasNext()) return bestehend.next();
+  return hauptordner.createFolder("Backups");
+}
+
+/** Erstellt eng dateierte Kopie vum ganze Übersicht-Sheet an engem separaten
+ *  Backup-Ordner, a läscht duerno al Backups (méi wéi BACKUP_BEHALEN_ANZUEL). */
+function erstelleWocheBackup() {
+  const backupOrdner = getBackupOrdner();
+  const datumStempel = Utilities.formatDate(new Date(), "Europe/Luxembourg", "yyyy-MM-dd_HH-mm");
+  const originalDatei = DriveApp.getFileById(OVERVIEW_SHEET_ID);
+  const kopie = originalDatei.makeCopy("Backup_PPREN_Uebersicht_" + datumStempel, backupOrdner);
+  Logger.log("✅ Backup erstellt: " + kopie.getName() + " (" + kopie.getUrl() + ")");
+  raeumAlBackupsOp();
+  return kopie.getUrl();
+}
+
+/** Behält just déi BACKUP_BEHALEN_ANZUEL nei(st) Backups, läscht den Rescht. */
+function raeumAlBackupsOp() {
+  const backupOrdner = getBackupOrdner();
+  const dateien = [];
+  const iter = backupOrdner.getFiles();
+  while (iter.hasNext()) {
+    const datei = iter.next();
+    dateien.push({ datei, erstallt: datei.getDateCreated() });
+  }
+  dateien.sort((a, b) => b.erstallt - a.erstallt); // nei zu al
+
+  const zeLaeschen = dateien.slice(BACKUP_BEHALEN_ANZUEL);
+  zeLaeschen.forEach((d) => d.datei.setTrashed(true));
+
+  if (zeLaeschen.length > 0) {
+    Logger.log("🗑️ " + zeLaeschen.length + " al Backup(s) geläscht (behalen: " + BACKUP_BEHALEN_ANZUEL + " neist).");
+  }
+}
+
+/** Just eemol lafen loossen, fir den automateschen Weekly-Backup-Trigger anzeriichten. */
+function installBackupTrigger() {
+  ScriptApp.getProjectTriggers().forEach((t) => {
+    if (t.getHandlerFunction() === "erstelleWocheBackup") ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger("erstelleWocheBackup").timeBased().onWeekDay(ScriptApp.WeekDay.SATURDAY).atHour(3).create();
+  Logger.log("✅ Backup-Trigger installéiert: all Samschdes ~3.00h moies.");
+}
