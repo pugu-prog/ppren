@@ -2594,6 +2594,29 @@ function pinZuruecksetzen(numm, proffToken, neiesPasswuert) {
   return { ok: false, error: "Numm net fonnt an der Login-Tabell. Probéiert d'Persoun iwwer 'Nei Persoun' nach eng Kéier ze späicheren (dat erstellt eng Login-Zeil, falls se feelt)." };
 }
 
+/**
+ * Emergency-Reset fir de Prof Guy Putz, wann de Web-App-Login "Falscht
+ * Passwuert" mellt — direkt am Apps-Script-Editor lafe loossen (▶️-Kn­app
+ * niewent der Funktioun), ëmgeet de Web-App-Login komplett a schreift den
+ * neie PIN-Hash direkt an d'Login-Sheet. Duerno de PIN hei ënnendrënner
+ * benotzen fir Iech un ze mellen; d'Funktioun duerno rëm ewechhuelen ass
+ * net néideg, awer se sollt net ëmmer nees mat deemselwechte PIN lafen.
+ */
+function notPasswuertResetGuyPutz() {
+  const NEIE_PIN = "2803";
+  const sheet = getLoginSheet();
+  const werte = sheet.getDataRange().getValues();
+  for (let i = 1; i < werte.length; i++) {
+    if (String(werte[i][0] || "").trim() === "Guy Putz") {
+      const salt = Utilities.getUuid();
+      sheet.getRange(i + 1, 4, 1, 2).setValues([[hashPin(NEIE_PIN, salt), salt]]);
+      Logger.log("✅ PIN fir 'Guy Putz' zréckgesat op: " + NEIE_PIN);
+      return;
+    }
+  }
+  Logger.log("⚠️ 'Guy Putz' net an der Login-Tabell fonnt.");
+}
+
 function seedRichtegSchuelerSept2026() {
   const SCHUELER = [
     { virnumm: "Ben", klasse: "1GSE", pin: "4172" },
