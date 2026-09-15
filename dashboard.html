@@ -220,8 +220,14 @@ function App() {
                     <td className="cell-muted">{p.Titel || "–"}</td>
                     <td><span className={`pill pill-${meta.key}`}>{meta.label}</span></td>
                     <td className="cell-muted">{p["Zuletzt aktualisiert"]}</td>
-                    <td>{p["Projektplan-Link"] ? <a className="link" href={p["Projektplan-Link"]} target="_blank" rel="noreferrer">Öffnen ↗</a> : <span className="cell-muted">–</span>}</td>
-                    <td>{p["Suivi-Link"] ? <a className="link" href={p["Suivi-Link"]} target="_blank" rel="noreferrer">Öffnen ↗</a> : <span className="cell-muted">–</span>}</td>
+                    <td className="link-cell">
+                      {p["Projektplan-Link"] ? <a className="link" href={p["Projektplan-Link"]} target="_blank" rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
+                      {p["Projektplan-PDF-Link"] && <a className="link link-pdf" href={p["Projektplan-PDF-Link"]} target="_blank" rel="noreferrer">PDF ↗</a>}
+                    </td>
+                    <td className="link-cell">
+                      {p["Suivi-Link"] ? <a className="link" href={p["Suivi-Link"]} target="_blank" rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
+                      {p["Suivi-PDF-Link (Schüler)"] && <a className="link link-pdf" href={p["Suivi-PDF-Link (Schüler)"]} target="_blank" rel="noreferrer">PDF ↗</a>}
+                    </td>
                     <td>{p["Dokumentatioun-Link"] ? <a className="link" href={p["Dokumentatioun-Link"]} target="_blank" rel="noreferrer">SharePoint ↗</a> : <span className="cell-muted">–</span>}</td>
                     <td>
                       {(meta.key === "pending" || meta.key === "done") && (
@@ -273,7 +279,10 @@ function App() {
                         <option value="Finalisiert">Finalisiert</option>
                       </select>
                     </td>
-                    <td>{b["Suivi-Link"] ? <a className="link" href={b["Suivi-Link"]} target="_blank" rel="noreferrer">Öffnen ↗</a> : <span className="cell-muted">–</span>}</td>
+                    <td className="link-cell">
+                      {b["Suivi-Link"] ? <a className="link" href={b["Suivi-Link"]} target="_blank" rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
+                      {b["Suivi-PDF-Link (Schüler)"] && <a className="link link-pdf" href={b["Suivi-PDF-Link (Schüler)"]} target="_blank" rel="noreferrer">PDF ↗</a>}
+                    </td>
                   </tr>
                 );
               })}
@@ -393,6 +402,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .status-select-final { background: #d7ecdd; color: #00A94F; }
 .status-select:disabled { opacity: 0.5; cursor: wait; }
 .link { color: #00A94F; font-weight: 700; text-decoration: none; font-size: 13px; }
+.link-cell { display: flex; gap: 10px; align-items: center; }
+.link-pdf { color: #4576B5; }
 .empty { padding: 40px; text-align: center; color: #6d7d74; font-size: 14px; background: #fff; border-radius: 12px; border: 1px solid #e2e8e3; margin: 0 22px; }
 .error { color: #8a2b1f; }
 .btn-gen { font-size: 11.5px; font-weight: 700; color: #00A94F; background: #eef3ef; border: 1px solid #c9d5cd; padding: 6px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
