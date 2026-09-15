@@ -2766,3 +2766,30 @@ function installBackupTrigger() {
   ScriptApp.newTrigger("erstelleWocheBackup").timeBased().onWeekDay(ScriptApp.WeekDay.SATURDAY).atHour(3).create();
   Logger.log("✅ Backup-Trigger installéiert: all Samschdes ~3.00h moies.");
 }
+
+/**
+ * ===== Wachhalen (Keep-Warm) =====
+ * Google Apps Script "schléift an", wann d'Web-App e Moment net benotzt
+ * gouf — den éischten Opruff duerno dauert 10-30 Sekonnen (Cold Start).
+ * Dës Funktioun sécht (nëmmen während Schoulzäiten) all 10 Minutten eng
+ * liicht Ufro un d'Web-App, fir de Prozess "waarm" ze halen, esou datt
+ * Schüler/Proffen déi Waardezäit net erliewen. Kascht näischt — läeft
+ * komplett am gratis Google-Apps-Script-Kontingent.
+ */
+function keepWarm() {
+  const stonn = new Date().getHours();
+  if (stonn < 7 || stonn > 18) return; // just während der Schoulzäit aktiv
+  try {
+    const url = ScriptApp.getService().getUrl();
+    if (url) UrlFetchApp.fetch(url + "?namen=1", { muteHttpExceptions: true });
+  } catch (e) { }
+}
+
+/** Just eemol lafen loossen, fir den automateschen Wachhalen-Trigger anzeriichten. */
+function installKeepWarmTrigger() {
+  ScriptApp.getProjectTriggers().forEach((t) => {
+    if (t.getHandlerFunction() === "keepWarm") ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger("keepWarm").timeBased().everyMinutes(10).create();
+  Logger.log("✅ Wachhalen-Trigger installéiert: all 10 Minutten, nëmmen 7-18 Auer aktiv.");
+}
