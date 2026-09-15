@@ -10,8 +10,10 @@
  *         _quelle_Projektplan_<Schüler>  – internes Google Doc (Arbeitskopie)
  *         Projektplan_<Schüler>.docx     – ECHTE Word-Datei, das ist die Datei,
  *                                          die Schüler/Lehrer öffnen/bearbeiten
+ *         Projektplan_<Schüler>.pdf      – PDF-Version (Deckblat + Inhalt)
  *         _quelle_Suivi_<Schüler>        – internes Google Doc (Arbeitskopie)
  *         Suivi_<Schüler>.docx           – ECHTE Word-Datei (Lehrer-Ansicht)
+ *         Suivi_<Schüler>.pdf            – PDF-Version (Deckblat + Inhalt)
  *     2027-28/                      – nächstes Schuljahr, automatisch neu angelegt
  *       ...
  *
@@ -259,6 +261,7 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     let url;
+    let pdfUrl;
     if (data.typ === "bewertung") {
       url = schreibeBewertung(data);
     } else if (data.typ === "statusAendern") {
@@ -321,9 +324,11 @@ function doPost(e) {
     } else if (data.typ === "bewertungsrasterSpäicheren") {
       return jsonResponse(bewertungsrasterSpäicheren(data));
     } else {
-      url = erstelleOderAktualisiereProjektplan(data);
+      const resultat = erstelleOderAktualisiereProjektplan(data);
+      url = resultat.url;
+      pdfUrl = resultat.pdfUrl;
     }
-    return jsonResponse({ ok: true, url });
+    return jsonResponse({ ok: true, url, pdfUrl });
   } catch (err) {
     return jsonResponse({ ok: false, error: err.message });
   }
@@ -1492,20 +1497,26 @@ function erstelleOderAktualisiereProjektplan(data) {
 
   fuelleProjektplanDokument(doc, data);
   const projektplanUrl = exportiereAlsWord(doc, ordner, `Projektplan_${data.schueler}`);
+  let projektplanPdfUrl = null;
+  try {
+    projektplanPdfUrl = exportiereAlsPdf(doc, ordner, `Projektplan_${data.schueler}`);
+  } catch (e) {
+    Logger.log("⚠️ PDF-Export vum Projektplang feelgeschloen: " + e.message);
+  }
 
   if (data.betreuerEmail) {
     DriveApp.getFileById(doc.getId()).addEditor(data.betreuerEmail);
   }
 
-  aktualisiereUebersicht(data, projektplanUrl, null);
+  aktualisiereUebersicht(data, projektplanUrl, null, null, projektplanPdfUrl);
   synchroniséierProjektplangMeilensteng(data.schueler, data.klasse, data.meilensteine || []);
 
   if ((data.status || "").startsWith("Frei")) {
     const suiviUrl = uebernehmeProjektplanInSuivi(data);
-    aktualisiereUebersicht(data, projektplanUrl, suiviUrl);
+    aktualisiereUebersicht(data, projektplanUrl, suiviUrl, null, projektplanPdfUrl);
   }
 
-  return projektplanUrl;
+  return { url: projektplanUrl, pdfUrl: projektplanPdfUrl };
 }
 
 function projektplanWiedereroeffnen(data) {
@@ -2184,9 +2195,9 @@ function entferneVorherigenAbschnitt(body, headingText) {
   return startIndex;
 }
 
-function aktualisiereUebersicht(data, projektplanUrl, suiviUrl, suiviPdfUrl) {
+function aktualisiereUebersicht(data, projektplanUrl, suiviUrl, suiviPdfUrl, projektplanPdfUrl) {
   const sheet = SpreadsheetApp.openById(OVERVIEW_SHEET_ID).getSheets()[0];
-  const sollHeader = ["Schüler", "Klasse", "Betreuer", "Titel", "Status", "Zuletzt aktualisiert", "Projektplan-Link", "Suivi-Link", "Suivi-PDF-Link (Schüler)", "Projektplan-Details (JSON)", "Dokumentatioun-Link"];
+  const sollHeader = ["Schüler", "Klasse", "Betreuer", "Titel", "Status", "Zuletzt aktualisiert", "Projektplan-Link", "Suivi-Link", "Suivi-PDF-Link (Schüler)", "Projektplan-Details (JSON)", "Dokumentatioun-Link", "Projektplan-PDF-Link"];
 
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(sollHeader);
@@ -2241,6 +2252,7 @@ function aktualisiereUebersicht(data, projektplanUrl, suiviUrl, suiviPdfUrl) {
     suiviPdfUrl || (bestehend ? bestehend[8] : ""),
     projektplanDetails,
     bestehend ? (bestehend[10] || "") : "",
+    projektplanPdfUrl || (bestehend ? bestehend[11] : ""),
   ];
 
   if (zeile > 0) {
@@ -2252,7 +2264,7 @@ function aktualisiereUebersicht(data, projektplanUrl, suiviUrl, suiviPdfUrl) {
 
 function speichereDokumentatiounLink(schueler, klasse, link) {
   const sheet = SpreadsheetApp.openById(OVERVIEW_SHEET_ID).getSheets()[0];
-  const sollHeader = ["Schüler", "Klasse", "Betreuer", "Titel", "Status", "Zuletzt aktualisiert", "Projektplan-Link", "Suivi-Link", "Suivi-PDF-Link (Schüler)", "Projektplan-Details (JSON)", "Dokumentatioun-Link"];
+  const sollHeader = ["Schüler", "Klasse", "Betreuer", "Titel", "Status", "Zuletzt aktualisiert", "Projektplan-Link", "Suivi-Link", "Suivi-PDF-Link (Schüler)", "Projektplan-Details (JSON)", "Dokumentatioun-Link", "Projektplan-PDF-Link"];
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(sollHeader);
   }
@@ -2264,7 +2276,7 @@ function speichereDokumentatiounLink(schueler, klasse, link) {
   if (zeile > 0) {
     sheet.getRange(zeile, 11).setValue(link);
   } else {
-    const neiZeil = [schueler, klasse || "", "", "", "Entwurf", Utilities.formatDate(new Date(), "Europe/Luxembourg", "dd.MM.yyyy HH:mm"), "", "", "", "", link];
+    const neiZeil = [schueler, klasse || "", "", "", "Entwurf", Utilities.formatDate(new Date(), "Europe/Luxembourg", "dd.MM.yyyy HH:mm"), "", "", "", "", link, ""];
     sheet.appendRow(neiZeil);
   }
   return { ok: true };
