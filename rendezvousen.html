@@ -57,7 +57,7 @@ function escapeIcs(text) {
 function baueIcsEvent(r) {
   const [t, m, j] = (r.Datum || "").split(".");
   if (!t || !m || !j) return "";
-  const uid = (r.ID || `${j}${m}${t}-${Math.random().toString(36).slice(2)}`) + "@ppren-projektplan";
+  const uid = (r.ID || `${j}${m}${t}-${Math.random().toString(36).slice(2)}`) + "@ppren";
   const summary = `PPREN: ${r.Typ} — ${r.Schüler}`;
   let dtstartZeil, dtendZeil;
 
