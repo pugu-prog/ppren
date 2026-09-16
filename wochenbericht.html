@@ -205,6 +205,7 @@ function App() {
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({
           typ: "wochenbericht",
+          token: window.PPREN_SESSION?.token || "",
           id: bericht.id,
           schueler: currentSchueler.name,
           klasse: currentSchueler.klasse,
