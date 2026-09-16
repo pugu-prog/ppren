@@ -121,7 +121,7 @@ function App() {
   // M1: Nimm live vum Backend lueden, keng hart-codéiert Lëscht méi.
   const [personen, setPersonen] = useState([]);
   useEffect(() => {
-    fetch(WEB_APP_URL + "?namen=1")
+    fetch(WEB_APP_URL + "?namen=1&token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""))
       .then((r) => r.json())
       .then((d) => setPersonen(d.personen || []))
       .catch(() => {});
