@@ -2541,16 +2541,6 @@ function hashPin(pin, salt) {
   return digest.map((b) => ("0" + (b & 0xff).toString(16)).slice(-2)).join("");
 }
 
-const FEST_PINS = {
-  "Guy Putz": "2803",
-  "Pol Medernach": "4127",
-  "Sarah Blum": "5936",
-  "Tania Ludwig": "7451",
-  "Tom Bleyer": "3298",
-  "Salman Murad": "6614",
-  "Alex Olinger": "1007",
-};
-
 function initialiséierLoginPins() {
   const sheet = getLoginSheet();
   const werte = sheet.getDataRange().getValues();
@@ -2559,7 +2549,7 @@ function initialiséierLoginPins() {
 
   Object.keys(typeof LEHRER_EMAILS !== "undefined" ? LEHRER_EMAILS : {}).forEach((numm) => {
     if (bestehendNimm.has(numm)) return;
-    const pin = FEST_PINS[numm] || String(Math.floor(1000 + Math.random() * 9000));
+    const pin = String(Math.floor(1000 + Math.random() * 9000));
     const salt = Utilities.getUuid();
     sheet.appendRow([numm, "Prof", "", hashPin(pin, salt), salt]);
     nei.push({ numm, rolle: "Prof", pin });
@@ -2661,7 +2651,7 @@ function pinZuruecksetzen(numm, proffToken, neiesPasswuert) {
  * net néideg, awer se sollt net ëmmer nees mat deemselwechte PIN lafen.
  */
 function notPasswuertResetGuyPutz() {
-  const NEIE_PIN = "2803";
+  const NEIE_PIN = String(Math.floor(1000 + Math.random() * 9000));
   const sheet = getLoginSheet();
   const werte = sheet.getDataRange().getValues();
   for (let i = 1; i < werte.length; i++) {
@@ -2675,15 +2665,19 @@ function notPasswuertResetGuyPutz() {
   Logger.log("⚠️ 'Guy Putz' net an der Login-Tabell fonnt.");
 }
 
+/**
+ * Eemoleg Seed-Funktioun (schonn ausgefouert fir de Schoulufank 2026-27).
+ * PINs ginn elo zoufälleg generéiert an am Log ausginn (net méi
+ * hardcodéiert), well dëse Code op engem ëffentlechen Repo läit.
+ */
 function seedRichtegSchuelerSept2026() {
   const SCHUELER = [
-    { virnumm: "Ben", klasse: "1GSE", pin: "4172" },
-    { virnumm: "Test", klasse: "1GSE", pin: "1508" },
-    { virnumm: "Max", klasse: "2GSE", pin: "8035" },
-    { virnumm: "Ivan", klasse: "2GSE", pin: "2947" },
-    { virnumm: "Mergon", klasse: "2GSE", pin: "6183" },
-    { virnumm: "Edson", klasse: "2GSE", pin: "5290" },
-    { virnumm: "Guillaume", klasse: "2GSE", pin: "7364" },
+    { virnumm: "Ben", klasse: "1GSE" },
+    { virnumm: "Max", klasse: "2GSE" },
+    { virnumm: "Ivan", klasse: "2GSE" },
+    { virnumm: "Mergon", klasse: "2GSE" },
+    { virnumm: "Edson", klasse: "2GSE" },
+    { virnumm: "Guillaume", klasse: "2GSE" },
   ];
 
   const personenSheet = getPersonenSheet();
@@ -2700,10 +2694,11 @@ function seedRichtegSchuelerSept2026() {
   const resultat = [];
   SCHUELER.forEach((s) => {
     const matrikel = generéierMatrikel(s.klasse);
+    const pin = String(Math.floor(1000 + Math.random() * 9000));
     personenSheet.appendRow([matrikel, s.virnumm, "", "Schüler", s.klasse, "", "Jo"]);
     const salt = Utilities.getUuid();
-    loginSheet.appendRow([matrikel, "Schüler", s.klasse, hashPin(s.pin, salt), salt]);
-    resultat.push({ matrikel, virnumm: s.virnumm, klasse: s.klasse, pin: s.pin });
+    loginSheet.appendRow([matrikel, "Schüler", s.klasse, hashPin(pin, salt), salt]);
+    resultat.push({ matrikel, virnumm: s.virnumm, klasse: s.klasse, pin });
   });
   Logger.log("✅ " + resultat.length + " Schüler ugeluecht:\n" + JSON.stringify(resultat, null, 2));
   return resultat;
