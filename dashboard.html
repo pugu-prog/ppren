@@ -114,7 +114,7 @@ function App() {
       const res = await fetch(WEB_APP_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ typ: "statusAendern", schueler, periode, neuerStatus }),
+        body: JSON.stringify({ typ: "statusAendern", token: window.PPREN_SESSION?.token || "", schueler, periode, neuerStatus }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Unbekannter Fehler");
