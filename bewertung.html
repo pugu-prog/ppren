@@ -638,6 +638,7 @@ function App() {
 
       const payload = {
         typ: "bewertung",
+        token: window.PPREN_SESSION?.token || "",
         schueler: currentSchueler.name,
         klasse: currentSchueler.klasse,
         periode,
