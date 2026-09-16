@@ -122,7 +122,7 @@ function App() {
       const res = await fetch(WEB_APP_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ typ: "dokumentatiounLink", schueler: currentSchueler.name, klasse: currentSchueler.klasse, link }),
+        body: JSON.stringify({ typ: "dokumentatiounLink", token: window.PPREN_SESSION?.token || "", schueler: currentSchueler.name, klasse: currentSchueler.klasse, link }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
