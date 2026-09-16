@@ -85,7 +85,7 @@ function App() {
       const res = await fetch(WEB_APP_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ typ: "wochenberichtEntschellegen", id: offen.ID, grond }),
+        body: JSON.stringify({ typ: "wochenberichtEntschellegen", token: window.PPREN_SESSION?.token || "", id: offen.ID, grond }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
@@ -112,7 +112,7 @@ function App() {
       const res = await fetch(WEB_APP_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ typ: "wochenberichtBewerten", id: offen.ID, punkte: p }),
+        body: JSON.stringify({ typ: "wochenberichtBewerten", token: window.PPREN_SESSION?.token || "", id: offen.ID, punkte: p }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
