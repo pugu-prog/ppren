@@ -111,7 +111,7 @@ function App() {
       const res = await fetch(WEB_APP_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ typ: "offiziellZaitplang", klasse, meilensteng: sortéiert.map(({ datum, titel, kategorie }) => ({ datum, titel, kategorie })) }),
+        body: JSON.stringify({ typ: "offiziellZaitplang", token: window.PPREN_SESSION?.token || "", klasse, meilensteng: sortéiert.map(({ datum, titel, kategorie }) => ({ datum, titel, kategorie })) }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
