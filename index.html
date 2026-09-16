@@ -214,6 +214,7 @@ function App() {
   const canSubmit = plan.betreuer && plan.titel && plan.inhalt && plan.motivation && plan.ziele && !budgetUeberschritten;
 
   const buildPayload = (status) => ({
+    token: window.PPREN_SESSION?.token || "",
     schueler: currentSchueler?.name || "",
     klasse: currentSchueler?.klasse || "",
     betreuer: LEHRER.find((l) => l.id === plan.betreuer)?.name || "",
