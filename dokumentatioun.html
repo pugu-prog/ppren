@@ -46,7 +46,7 @@ function App() {
   const [personen, setPersonen] = useState([]);
   const [personenGelueden, setPersonenGelueden] = useState(false);
   useEffect(() => {
-    fetch(WEB_APP_URL + "?namen=1")
+    fetch(WEB_APP_URL + "?namen=1&token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""))
       .then((r) => r.json())
       .then((d) => setPersonen(d.personen || []))
       .catch(() => {})
@@ -223,7 +223,7 @@ function App() {
               <h2>1. SharePoint-Link vun denger Dokumentatioun</h2>
               <p className="hint">
                 Deng Dokumentatioun (Word-Virlag) läit op eisem Schoul-SharePoint. Kopéier hei de Link zu
-                denger Datei era — de Prof kann duerno jidderzäit driwwer kucken, wéi wäit s du bass, ouni
+                denger Datei era — de Prof kann duerno jidderzäit drëwwer kucken, wéi wäit s du bass, ouni
                 nach eng Kéier ze froen.
               </p>
               <label className="field">

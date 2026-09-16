@@ -89,7 +89,7 @@ function App() {
   const [personen, setPersonen] = useState([]);
   const [personenGelueden, setPersonenGelueden] = useState(false);
   useEffect(() => {
-    fetch(WEB_APP_URL + "?namen=1")
+    fetch(WEB_APP_URL + "?namen=1&token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""))
       .then((r) => r.json())
       .then((d) => setPersonen(d.personen || []))
       .catch(() => {})
@@ -320,7 +320,7 @@ function App() {
               <h2>Neien Wochenbericht — {bericht.woche}</h2>
               <div className="punkte-hint">Zusammefaassung 2P · Fortschrëtt 1,5P · Ahänk 1P · Grammatik 0,5P — max. 5P/Bericht</div>
               {bestehendFuerWoche && (
-                <p className="notice">ℹ️ Du hues fir dës Woch scho e (nach net bewäerte) Bericht ofginn — mat Späicheren ännerss du en.</p>
+                <p className="notice">ℹ️ Du hues fir dës Woch scho e (nach net bewäerte) Bericht ofginn — mat Späicheren änderss du en.</p>
               )}
 
               {meilensteng.length > 0 && (
@@ -342,7 +342,7 @@ function App() {
 
               <label className="field">
                 <span className="field-label">Wochenzesummefaassung <em>(mindestens 5 Zeilen)</em></span>
-                <textarea className="textarea" rows={5} placeholder="Duerchgefouert Aktivitéiten... Opgetruede Problemer..." value={bericht.zusammenfassung} onChange={(e) => setBericht({ ...bericht, zusammenfassung: e.target.value })} />
+                <textarea className="textarea" rows={5} placeholder="Duerchgeféiert Aktivitéiten... Opgetruede Problemer..." value={bericht.zusammenfassung} onChange={(e) => setBericht({ ...bericht, zusammenfassung: e.target.value })} />
               </label>
 
               <label className="field">
