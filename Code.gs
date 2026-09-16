@@ -265,22 +265,22 @@ function doPost(e) {
     if (data.typ === "bewertung") {
       url = schreibeBewertung(data);
     } else if (data.typ === "statusAendern") {
-      aendereBewertungsStatus(data.schueler, data.periode, data.neuerStatus);
+      aendereBewertungsStatus(data);
       return jsonResponse({ ok: true });
     } else if (data.typ === "meilensteng") {
-      speichereMeilensteng(data.schueler, data.klasse, data.meilensteng);
+      speichereMeilensteng(data);
       return jsonResponse({ ok: true });
     } else if (data.typ === "offiziellZaitplang") {
-      speichereOffiziellZaitplang(data.klasse, data.meilensteng);
+      speichereOffiziellZaitplang(data);
       return jsonResponse({ ok: true });
     } else if (data.typ === "wochenbericht") {
       const id = speichereWochenbericht(data);
       return jsonResponse({ ok: true, id });
     } else if (data.typ === "wochenberichtBewerten") {
-      bewerteWochenbericht(data.id, data.punkte);
+      bewerteWochenbericht(data);
       return jsonResponse({ ok: true });
     } else if (data.typ === "wochenberichtEntschellegen") {
-      entschellegWochenbericht(data.id, data.grond);
+      entschellegWochenbericht(data);
       return jsonResponse({ ok: true });
     } else if (data.typ === "fachgespraech") {
       const id = speichereFachgespraech(data);
@@ -298,7 +298,7 @@ function doPost(e) {
     } else if (data.typ === "pinZuruecksetzen") {
       return jsonResponse(pinZuruecksetzen(data.numm, data.proffToken, data.neiesPasswuert));
     } else if (data.typ === "dokumentatiounLink") {
-      return jsonResponse(speichereDokumentatiounLink(data.schueler, data.klasse, data.link));
+      return jsonResponse(speichereDokumentatiounLink(data));
     } else if (data.typ === "rendezvousPlangen") {
       return jsonResponse(plangRendezvous(data));
     } else if (data.typ === "rendezvousLaeschen") {
@@ -334,7 +334,12 @@ function doPost(e) {
   }
 }
 
-function aendereBewertungsStatus(schueler, periode, neuerStatus) {
+function aendereBewertungsStatus(data) {
+  const session = pruefSession(data.token);
+  if (!session.valid || session.rolle !== "Prof") {
+    throw new Error("Nëmme Proffen dierfen de Bewertungsstatus änneren.");
+  }
+  const { schueler, periode, neuerStatus } = data;
   if (neuerStatus !== "Entwurf" && neuerStatus !== "Finalisiert") {
     throw new Error("Ungültiger Status: " + neuerStatus);
   }
@@ -351,7 +356,12 @@ function aendereBewertungsStatus(schueler, periode, neuerStatus) {
   throw new Error("Keine Bewertung gefunden für " + schueler + " – " + periode);
 }
 
-function speichereMeilensteng(schueler, klasse, meilensteng) {
+function speichereMeilensteng(data) {
+  const session = pruefSession(data.token);
+  if (!session.valid || (session.rolle !== "Prof" && session.numm !== data.schueler)) {
+    throw new Error("Net erlaabt.");
+  }
+  const { schueler, klasse, meilensteng } = data;
   const ss = SpreadsheetApp.openById(OVERVIEW_SHEET_ID);
   let sheet = ss.getSheetByName("Meilensteng");
   if (!sheet) {
@@ -425,7 +435,7 @@ function getOffiziellZaitplangSheet() {
   return sheet;
 }
 
-function speichereOffiziellZaitplang(klasse, meilensteng) {
+function speichereOffiziellZaitplangIntern(klasse, meilensteng) {
   const sheet = getOffiziellZaitplangSheet();
   const werte = sheet.getDataRange().getValues();
   for (let i = werte.length - 1; i >= 1; i--) {
@@ -434,6 +444,15 @@ function speichereOffiziellZaitplang(klasse, meilensteng) {
   meilensteng.forEach((m) => {
     sheet.appendRow([klasse, m.datum, m.titel, m.kategorie || "Event"]);
   });
+}
+
+/** Ëffentlech (HTTP-)Variant mat Session/Roll-Kontroll — nëmmen Proffen. */
+function speichereOffiziellZaitplang(data) {
+  const session = pruefSession(data.token);
+  if (!session.valid || session.rolle !== "Prof") {
+    throw new Error("Nëmme Proffen dierfen den offizielle Zäitplang änneren.");
+  }
+  speichereOffiziellZaitplangIntern(data.klasse, data.meilensteng);
 }
 
 function seedOffiziellZaitplangVunZeitplangHtml() {
@@ -478,8 +497,8 @@ function seedOffiziellZaitplangVunZeitplangHtml() {
     { datum: "2027-06-22", titel: "Presentatioun & Ofgab Dokumentatioun (Datum nach net confirméiert — evtl. 29.06)", kategorie: "Ofgab" },
     { datum: "2027-06-29", titel: "Fachgespréicher (Datum nach net confirméiert — evtl. 30.06)", kategorie: "Event" },
   ];
-  speichereOffiziellZaitplang("1GSE", EIN_1GSE);
-  speichereOffiziellZaitplang("2GSE", EIN_2GSE);
+  speichereOffiziellZaitplangIntern("1GSE", EIN_1GSE);
+  speichereOffiziellZaitplangIntern("2GSE", EIN_2GSE);
   Logger.log("✅ OffiziellZaitplang gefëllt: " + EIN_1GSE.length + " Zeile(n) fir 1GSE, " + EIN_2GSE.length + " Zeile(n) fir 2GSE.");
 }
 
@@ -520,6 +539,10 @@ function notifizéierBetreuerNeierBericht(schueler, betreuerListe, woche) {
 }
 
 function speichereWochenbericht(data) {
+  const session = pruefSession(data.token);
+  if (!session.valid || (session.rolle !== "Prof" && session.numm !== data.schueler)) {
+    throw new Error("Net erlaabt.");
+  }
   const sheet = getWochenberichteSheet();
   const jetzt = Utilities.formatDate(new Date(), "Europe/Luxembourg", "dd.MM.yyyy HH:mm");
   const werte = sheet.getDataRange().getValues();
@@ -577,7 +600,12 @@ function speichereWochenbericht(data) {
   return neiId;
 }
 
-function bewerteWochenbericht(id, punkte) {
+function bewerteWochenbericht(data) {
+  const session = pruefSession(data.token);
+  if (!session.valid || session.rolle !== "Prof") {
+    throw new Error("Nëmme Proffen dierfen Wochenberichter bewäerten.");
+  }
+  const { id, punkte } = data;
   const sheet = getWochenberichteSheet();
   const werte = sheet.getDataRange().getValues();
   const jetzt = Utilities.formatDate(new Date(), "Europe/Luxembourg", "dd.MM.yyyy HH:mm");
@@ -590,7 +618,12 @@ function bewerteWochenbericht(id, punkte) {
   throw new Error("Wochebericht net fonnt: " + id);
 }
 
-function entschellegWochenbericht(id, grond) {
+function entschellegWochenbericht(data) {
+  const session = pruefSession(data.token);
+  if (!session.valid || session.rolle !== "Prof") {
+    throw new Error("Nëmme Proffen dierfen e Wochenbericht entschëllegen.");
+  }
+  const { id, grond } = data;
   const sheet = getWochenberichteSheet();
   const werte = sheet.getDataRange().getValues();
   const jetzt = Utilities.formatDate(new Date(), "Europe/Luxembourg", "dd.MM.yyyy HH:mm");
@@ -644,6 +677,10 @@ function getFachgespraechSheet() {
 }
 
 function speichereFachgespraech(data) {
+  const session = pruefSession(data.token);
+  if (!session.valid || session.rolle !== "Prof") {
+    throw new Error("Nëmme Proffen dierfen e Fachgespréich bewäerten.");
+  }
   const sheet = getFachgespraechSheet();
   const jetzt = Utilities.formatDate(new Date(), "Europe/Luxembourg", "dd.MM.yyyy HH:mm");
   const fachwissenSumme = (data.froen || []).reduce((s, f) => s + (Number(f.punkte) || 0), 0);
@@ -682,6 +719,10 @@ function getZieluewerpreiwungSheet() {
 }
 
 function speichereZieluewerpreiwung(data) {
+  const session = pruefSession(data.token);
+  if (!session.valid || session.rolle !== "Prof") {
+    throw new Error("Nëmme Proffen dierfen eng Ziel-Iwwerpréiwung bewäerten.");
+  }
   const sheet = getZieluewerpreiwungSheet();
   const jetzt = Utilities.formatDate(new Date(), "Europe/Luxembourg", "dd.MM.yyyy HH:mm");
   const werte = sheet.getDataRange().getValues();
@@ -1482,6 +1523,10 @@ function exportiereAlsPdf(doc, ordner, sichtbarerName) {
 }
 
 function erstelleOderAktualisiereProjektplan(data) {
+  const session = pruefSession(data.token);
+  if (!session.valid || (session.rolle !== "Prof" && session.numm !== data.schueler)) {
+    throw new Error("Net erlaabt.");
+  }
   const bisherigerStatus = getAktuellenStatus(data.schueler);
   if (bisherigerStatus && bisherigerStatus.startsWith("Frei") && data.status !== "Entwurf") {
     throw new Error("Der Projektplan ist bereits freigegeben und gesperrt (Stand Ende Oktober). Nur die Betreuer/-in kann ihn zur Bearbeitung wieder öffnen.");
@@ -2023,6 +2068,10 @@ function getBetreuerFuerSchueler(schueler) {
 }
 
 function schreibeBewertung(data) {
+  const session = pruefSession(data.token);
+  if (!session.valid || session.rolle !== "Prof") {
+    throw new Error("Nëmme Proffen dierfen eng Bewertung späicheren.");
+  }
   const bisherigerStatus = getAktuellenBewertungsStatus(data.schueler, data.periode);
   if (bisherigerStatus === "Finalisiert") {
     throw new Error("Diese Bewertung (" + data.periode + ") ist bereits finalisiert und gesperrt.");
@@ -2262,7 +2311,12 @@ function aktualisiereUebersicht(data, projektplanUrl, suiviUrl, suiviPdfUrl, pro
   }
 }
 
-function speichereDokumentatiounLink(schueler, klasse, link) {
+function speichereDokumentatiounLink(data) {
+  const session = pruefSession(data.token);
+  if (!session.valid || (session.rolle !== "Prof" && session.numm !== data.schueler)) {
+    return { ok: false, error: "Net erlaabt." };
+  }
+  const { schueler, klasse, link } = data;
   const sheet = SpreadsheetApp.openById(OVERVIEW_SHEET_ID).getSheets()[0];
   const sollHeader = ["Schüler", "Klasse", "Betreuer", "Titel", "Status", "Zuletzt aktualisiert", "Projektplan-Link", "Suivi-Link", "Suivi-PDF-Link (Schüler)", "Projektplan-Details (JSON)", "Dokumentatioun-Link", "Projektplan-PDF-Link"];
   if (sheet.getLastRow() === 0) {
