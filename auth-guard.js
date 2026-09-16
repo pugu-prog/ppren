@@ -35,11 +35,20 @@
 
   const erfuerdertRolle = window.PPREN_ERFUERDERT_ROLLE;
   if (erfuerdertRolle && rolle !== erfuerdertRolle && rolle !== "Prof") {
+    // document.open() bricht d'Parsen vum ursprénglechen Dokument definitiv of
+    // (net just document.write() eleng — dat géif nëmmen den Text asetzen an
+    // duerno de Rescht vun der Säit, inkl. spéider Script-Tags, TROTZDEM weider
+    // lueden/ausféieren, well de Wurf hei drënner just dëse Script-Block ofbrécht,
+    // net d'ganzt Dokument).
+    document.open();
     document.write(
-      '<div style="padding:60px 20px;text-align:center;font-family:sans-serif;color:#8a2b1f;">' +
+      '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Kee Zougrëff</title></head><body>' +
+      '<div style="padding:60px 20px;text-align:center;font-family:-apple-system,\'Segoe UI\',Inter,Arial,sans-serif;color:#8a2b1f;">' +
       "<h2>Kee Zougrëff</h2><p>Dës Säit ass just fir " + erfuerdertRolle + ".</p>" +
-      '<a href="links.html" style="color:#00A94F;font-weight:700;">← Zréck</a></div>'
+      '<a href="links.html" style="color:#00A94F;font-weight:700;">← Zréck</a></div>' +
+      '</body></html>'
     );
+    document.close();
     throw new Error("PPREN Auth: Roll net erlaabt");
   }
 
