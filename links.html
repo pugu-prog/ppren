@@ -5,84 +5,40 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="icon" type="image/png" href="LogoSE_weisHintergrund.png" />
 <title>PPREN – Sciences Environnementales</title>
-<style>
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-serif; color: #1c2621; background: #f6f8f6; }
-  .hero { background: #ffffff; border-bottom: 1px solid #e2e8e3; padding: 40px 22px 32px; text-align: center; }
-  .hero-logos { display: flex; align-items: center; justify-content: center; gap: 28px; margin-bottom: 18px; flex-wrap: wrap; }
-  .hero-logos img { height: 92px; width: auto; }
-  .hero-bar { height: 3px; width: 90px; background: #F67E1B; margin: 0 auto 18px; border-radius: 2px; }
-  .hero h1 { font-size: 22px; font-weight: 800; letter-spacing: 0.03em; margin: 0 0 6px; color: #1c2621; }
-  .hero p { font-size: 14px; color: #55625a; margin: 0; }
-  .content { max-width: 880px; margin: 0 auto; padding: 28px 20px 60px; position: relative; }
-  .rubrik { margin-bottom: 30px; }
-  .rubrik-head { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; padding: 0 4px; }
-  .rubrik-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
-  .rubrik-icon-proffen { background: #eef3ef; }
-  .rubrik-icon-schueler { background: #e7eef7; }
-  .rubrik-titel { font-size: 16px; font-weight: 800; color: #1c2621; }
-  .rubrik-sub { font-size: 12px; color: #6d7d74; margin-top: 1px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
-  .card { display: flex; flex-direction: column; gap: 6px; background: #fff; border: 1px solid #e2e8e3; border-radius: 14px; padding: 16px 18px; text-decoration: none; color: inherit; box-shadow: 0 1px 2px rgba(28,38,33,0.03); transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease; }
-  .card:hover { border-color: #00A94F; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,169,79,0.12); }
-  .card-icon { font-size: 24px; }
-  .card-label { font-weight: 700; font-size: 14.5px; }
-  .card-desc { font-size: 12px; color: #6d7d74; line-height: 1.4; }
-  .footer-note { font-size: 11.5px; color: #93a098; text-align: center; margin-top: 36px; line-height: 1.6; }
-</style>
+<script>
+  // Zentral Astigspunkt: kennt direkt d'Roll (aus enger gëlteger Session) a
+  // leet ouni Ëmweg op déi passend Hub-Säit weider — Proffen op proffen.html,
+  // Schüler op schueler.html. Ouni gëlteg Session: direkt op d'Umeldung.
+  // (function() wielt "replace" amplaz "href", fir dëse Sprong net an der
+  // Browser-Historique ze hannerloossen — "Zréck" landt sou net hei erëm.)
+  (function () {
+    var token = localStorage.getItem("ppren_token");
+    var rolle = localStorage.getItem("ppren_rolle");
+    if (token && rolle) {
+      window.location.replace(rolle === "Prof" ? "proffen.html" : "schueler.html");
+    } else {
+      window.location.replace("login.html");
+    }
+  })();
+</script>
 </head>
 <body>
-  <header class="hero">
-    <div class="hero-logos">
-      <img src="https://raw.githubusercontent.com/pugu-prog/ppren/main/LogoSE_weisHintergrund.png" alt="Sciences Environnementales" />
-      <img src="https://raw.githubusercontent.com/pugu-prog/ppren/main/LTEtt_Logo.png" alt="Lycée Technique d'Ettelbruck" />
-    </div>
-    <div class="hero-bar"></div>
-    <h1>PPREN — Projet Personnel Encadré</h1>
-    <p>Sciences Environnementales · Lycée Technique d'Ettelbruck</p>
-  </header>
-  <main class="content">
-    <section class="rubrik">
-      <div class="rubrik-head">
-        <span class="rubrik-icon rubrik-icon-proffen">👩‍🏫</span>
-        <div>
-          <div class="rubrik-titel">Fir d'Proffen</div>
-          <div class="rubrik-sub">Bewerten, Iwwersiicht behalen, Noten exportéieren</div>
-        </div>
-      </div>
-      <div class="grid">
-        <a class="card" href="https://pugu-prog.github.io/ppren/bewertung.html" target="_blank"><span class="card-icon">📊</span><span class="card-label">Bewertungsformulaire</span><span class="card-desc">Punkten, Remarquen a Kommentar pro Periode aginn</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/fachgespraech.html" target="_blank"><span class="card-icon">🗣️</span><span class="card-label">Fachgespréich</span><span class="card-desc">Timer, Froen a Punkten fir d'Fachgespréich</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/zieluewerpreiwung.html" target="_blank"><span class="card-icon">🎯</span><span class="card-label">Ziler iwwerpréiwen</span><span class="card-desc">Kuerz Rendez-vous, keng Preparatioun, dynamesch Skala</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/wochenberichte-korrigeieren.html" target="_blank"><span class="card-icon">📋</span><span class="card-label">Wochenberichter korrigéieren</span><span class="card-desc">Punkten a Kommentar pro wéchentlechem Bericht</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/zeitplang-verwalten.html" target="_blank"><span class="card-icon">🔒</span><span class="card-label">Zäitplang verwalten</span><span class="card-desc">Zentral offiziell Meilensteng änneren (nëmmen Proffen!)</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/dashboard.html" target="_blank"><span class="card-icon">📈</span><span class="card-label">Lehrer-Dashboard</span><span class="card-desc">Iwwersiicht iwwer all Schülerprojeten</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/noten.html" target="_blank"><span class="card-icon">🧮</span><span class="card-label">Notentabell</span><span class="card-desc">All Noten nieft enee, als CSV/Excel exportéierbar</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/zeitplang.html" target="_blank"><span class="card-icon">🗓️</span><span class="card-label">Zäitplang 26/27</span><span class="card-desc">Iwwersiicht iwwer d'Etappen a Fristen fir 1GSE a 2GSE</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/planung.html" target="_blank"><span class="card-icon">🧭</span><span class="card-label">Planungstool</span><span class="card-desc">Meilensteng pro Schüler aginn a verfollegen</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/gantt.html" target="_blank"><span class="card-icon">📊</span><span class="card-label">Gantt-Chart</span><span class="card-desc">Visuell Zäitschinn vun de Meilensteng</span></a>
-        <a class="card" href="https://drive.google.com/drive/folders/12eeECkttG0U1-zRHM__age2FdZp3MOmy" target="_blank"><span class="card-icon">📁</span><span class="card-label">Google Drive</span><span class="card-desc">Projektplang- a Suivi-Dateien vun alle Schüler</span></a>
-      </div>
-    </section>
-    <section class="rubrik">
-      <div class="rubrik-head">
-        <span class="rubrik-icon rubrik-icon-schueler">🎓</span>
-        <div>
-          <div class="rubrik-titel">Fir d'Schüler</div>
-          <div class="rubrik-sub">Projektplang ausfëllen, Fortschrëtt kucken</div>
-        </div>
-      </div>
-      <div class="grid">
-        <a class="card" href="https://pugu-prog.github.io/ppren/" target="_blank"><span class="card-icon">📝</span><span class="card-label">Projektplan-Formulaire</span><span class="card-desc">Däin Projektplang ausfëllen an aginn</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/wochenbericht.html" target="_blank"><span class="card-icon">📅</span><span class="card-label">Wochenbericht</span><span class="card-desc">Wöchentlechen Bericht ausfëllen an ofginn</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/suivi.html" target="_blank"><span class="card-icon">🎯</span><span class="card-label">Mäin Suivi</span><span class="card-desc">Fortschrëtt, Punkten, Remarquen a Meilensteng kucken</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/zeitplang.html" target="_blank"><span class="card-icon">🗓️</span><span class="card-label">Zäitplang 26/27</span><span class="card-desc">Wéini ass wat drun — fir 1GSE a 2GSE</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/planung.html" target="_blank"><span class="card-icon">🧭</span><span class="card-label">Planungstool</span><span class="card-desc">Meng eege Meilensteng aginn a verfollegen</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/gantt.html" target="_blank"><span class="card-icon">📊</span><span class="card-label">Gantt-Chart</span><span class="card-desc">Meng Zäitschinn visuell kucken</span></a>
-        <a class="card" href="https://pugu-prog.github.io/ppren/budget.html" target="_blank"><span class="card-icon">💰</span><span class="card-label">Budget</span><span class="card-desc">Ausgaben aginn a Restbudget kucken (nom Genehmegen vum Prof)</span></a>
-      </div>
-    </section>
-    <p class="footer-note">PPREN-Prototyp · Sciences Environnementales · Lycée Technique d'Ettelbruck<br>Aktuell mat fiktiven Testnimm — nach net fir richteg Schülerdaten geduecht.</p>
-  </main>
+<div class="page">
+  <img class="logo" src="LogoSE_weisHintergrund.png" alt="" />
+  <div class="spinner"></div>
+  <p class="hint">Ee Moment, mir leeden dech weider…</p>
+  <noscript>
+    <p>JavaScript ass néideg. <a href="login.html">Weider zur Umeldung</a></p>
+  </noscript>
+</div>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-serif; color: #1c2621; background: #ffffff; }
+  .page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; text-align: center; }
+  .logo { width: 96px; height: auto; opacity: 0.92; }
+  .spinner { width: 26px; height: 26px; border: 3px solid #e2e8e3; border-top-color: #00A94F; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  .hint { font-size: 13px; color: #6d7d74; margin: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
 </body>
 </html>
