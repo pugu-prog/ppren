@@ -75,7 +75,7 @@ function App() {
   // M1: Nimm live vum Backend lueden, keng hart-codéiert Lëscht méi.
   const [personen, setPersonen] = useState([]);
   useEffect(() => {
-    fetch(WEB_APP_URL + "?namen=1")
+    fetch(WEB_APP_URL + "?namen=1&token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""))
       .then((r) => r.json())
       .then((d) => setPersonen(d.personen || []))
       .catch(() => {});
@@ -296,7 +296,7 @@ function App() {
                   <button className="btn-gen" onClick={csvExport}>⬇️ CSV</button>
                 </div>
               </div>
-              <p className="hint">🔒 Offiziell Meilensteng (gro) kommen automatesch vum Prof. 📝 Projektplang-Meilensteng (blo) kommen aus dengem <a href={`index.html`}>Projektplang-Formulaire</a> — Datum/Titel do änneren, Status/Notiz hei. Deng eege Meilensteng (orange) kanns du fräi bearbechten. Kléck op ▾ fir méi Detailer (Beschreiwung + verlinkte Wochenberichter).</p>
+              <p className="hint">🔒 Offiziell Meilensteng (gro) kommen automatesch vum Prof. 📝 Projektplang-Meilensteng (blo) kommen aus dengem <a href={`index.html`}>Projektplang-Formulaire</a> — Datum/Titel do änneren, Status/Notiz hei. Deng eege Meilensteng (orange) kanns du fréi bearbechten. Kléck op ▾ fir méi Detailer (Beschreiwung + verlinkte Wochenberichter).</p>
               <div className="tabelle-wrap">
                 <table className="tabelle">
                   <thead>
