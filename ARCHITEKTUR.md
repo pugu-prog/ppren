@@ -4,8 +4,8 @@ Kuerz Iwwersiicht wou wat läit — als Orientéierung, well d'System iwwer méi
 
 ## 1. Front-End — GitHub
 
-- **Repo**: [pugu-prog/ppren-projektplan](https://github.com/pugu-prog/ppren-projektplan)
-- **Live-URL**: https://pugu-prog.github.io/ppren-projektplan/ (GitHub Pages) — Astigspunkt fir Proffen a Schüler ass normalerweis [links.html](https://pugu-prog.github.io/ppren-projektplan/links.html)
+- **Repo**: [pugu-prog/ppren](https://github.com/pugu-prog/ppren)
+- **Live-URL**: https://pugu-prog.github.io/ppren/ (GitHub Pages) — Astigspunkt fir Proffen a Schüler ass normalerweis [links.html](https://pugu-prog.github.io/ppren/links.html)
 - ~26 statesch HTML-Säiten, React iwwer CDN + Babel am Browser (keng Build-Kette, kee `npm install` néideg)
 - Jiddereng Säit huet hire ganze Code (JS + CSS) inline an der `.html`-Datei; `auth-guard.js` ass déi eenzeg gedeelt Datei
 - Ännerung = Datei am Repo upassen a pushen → gëtt bannent Minutten iwwer GitHub Pages live
@@ -13,7 +13,7 @@ Kuerz Iwwersiicht wou wat läit — als Orientéierung, well d'System iwwer méi
 ## 2. Back-End — Google Apps Script
 
 - **Projet**: "PPREN web" (Editor iwwer [script.google.com/home](https://script.google.com/home) am `gseltett@gmail.com`-Konto opmaachen)
-- **Deployte Web-App-URL** (déi d'Front-End benotzt): `https://script.google.com/macros/s/AKfycbwNDO4bJv1lYKvwg57TnHzVHxLIJJikxD0ey7RHlraqa9nUSs8liBJycF38p4X--t_6/exec`
+- **Deployte Web-App-URL** (déi d'Front-End benotzt): `https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec`
 - Eng eenzeg Datei `Code.gs` (~2300 Zeilen): Login/PIN/Session-Verwaltung, `doGet`/`doPost`-Router fir all Aktioun, Google-Doc-Generatioun (Projektplang, Suivi, Bewertung), E-Mail-Versand
 - **Wichteg**: no all Ännerung um Code muss iwwer *Deploy → Manage deployments → ✏️ Edit → New version* nei deployt ginn — de rohen Editor-Stand gëllt net automatesch fir déi live URL
 
