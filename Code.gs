@@ -71,11 +71,15 @@ function bewertungEntsperrenDialog() {
 }
 
 function doGet(e) {
+  const session = pruefSession(e.parameter && e.parameter.token);
+
   if (e.parameter && e.parameter.namen === "1") {
+    if (!session.valid) {
+      return jsonResponse({ ok: false, error: "Net ugemellt." });
+    }
     return jsonResponse({ ok: true, personen: getAktivePersonen() });
   }
 
-  const session = pruefSession(e.parameter && e.parameter.token);
   if (!session.valid) {
     return jsonResponse({ ok: false, error: "Net ugemellt." });
   }
