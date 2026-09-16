@@ -376,7 +376,7 @@ function App() {
   // M1: Nimm live vum Backend lueden, keng hart-codéiert Lëscht méi.
   const [personen, setPersonen] = useState([]);
   useEffect(() => {
-    fetch(WEB_APP_URL + "?namen=1")
+    fetch(WEB_APP_URL + "?namen=1&token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""))
       .then((r) => r.json())
       .then((d) => setPersonen(d.personen || []))
       .catch(() => {});
@@ -751,7 +751,7 @@ function App() {
                     <p className="notice notice-success">✅ Automatesch iwwerholl aus dem Fachgespréich-Tool ({fgInfo.datum}, Variante {fgInfo.variante}). Bäi Bedarf hei nach upassen.</p>
                   )}
                   {g.typ === "fachgespraech" && !fgInfo && (
-                    <p className="notice">ℹ️ Nach kee gespäichert Fachgespréich fonnt fir dës Period — manuell aginn oder éischt am Fachgespréich-Tool ausfëllen.</p>
+                    <p className="notice">ℹ️ Nach kee gespäichert Fachgespréich fonnt fir dës Period — manuell aginn oder éischt am Fachgespréich-Tool ausfëlen.</p>
                   )}
                   {(gruppiert[g.titel] || []).some((k) => k.name === "Bewältigung des Themas") && (
                     <div className="card-head-row">
@@ -763,7 +763,7 @@ function App() {
                     <p className="notice notice-success">✅ {zpInfo.summe}P automatesch aus {zpInfo.anzuel} Ziel-Iwwerpréiwung(en) iwwerholl fir "Bewältigung des Themas" — Autonomie-Undeel bäi Bedarf nach dobäi addéieren.</p>
                   )}
                   {(gruppiert[g.titel] || []).some((k) => k.name === "Bewältigung des Themas") && !zpInfo && (
-                    <p className="notice">ℹ️ Nach keng Ziel-Iwwerpréiwung fir dës Period gespäichert — manuell aginn oder éischt am Ziler-iwwerpréiwen-Tool ausfëllen.</p>
+                    <p className="notice">ℹ️ Nach keng Ziel-Iwwerpréiwung fir dës Period gespäichert — manuell aginn oder éischt am Ziler-iwwerpréiwen-Tool ausfëlen.</p>
                   )}
 
                   {(gruppiert[g.titel] || []).map((k) => (
@@ -891,7 +891,7 @@ function App() {
               <p className="notice notice-info">
                 ℹ️ <strong>Éischt Entworf, duerno Validéieren:</strong> "Entworf späicheren" hält deng Punkten a
                 Kommentaren fest, ouni datt de Schüler eppes gesäit. Éischt wann s du op <strong>„✅ Validéieren“</strong>
-                dréckst, gëtt d'Bewertung tatsächlech an de Suivi vum Schüler geschriwwen (a gläichzäiteg gesperrt).
+                dréckss, gëtt d'Bewertung tatsächlech an de Suivi vum Schüler geschriwwen (a gläichzäiteg gesperrt).
               </p>
             </section>
 
