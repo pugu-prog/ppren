@@ -2699,6 +2699,69 @@ function notPasswuertResetGuyPutz() {
 }
 
 /**
+ * Kompletten Ënn-zu-Ënn-Test: setzt e PIN a probéiert sech direkt domadder
+ * unzemellen — alles an DËSER selwechter Ausféierung, ouni Web-App, ouni
+ * Deployment. Schreift d'Resultat an d'Debug-Sheet. Hëlleft ze ënnerscheeden
+ * tëscht "Feeler am Code" (dëse Test géif och feelschloen) a "Feeler am
+ * Deployment/Cache" (dëse Test géif klappen, obwuel d'Web-App nach ëmmer
+ * feelschléit).
+ */
+function notPasswuertResetUnitTest() {
+  const sheet = getLoginSheet();
+  const werte = sheet.getDataRange().getValues();
+
+  // 1) All Zeilen fannen, déi "guy putz" casse-insensitiv passen — fir
+  //    Duplikater z'entdecken.
+  const passendZeilen = [];
+  for (let i = 1; i < werte.length; i++) {
+    if (String(werte[i][0] || "").trim().toLowerCase() === "guy putz") {
+      passendZeilen.push({ zeil: i + 1, loginId: werte[i][0], rolle: werte[i][1] });
+    }
+  }
+
+  // 2) PIN zrécksetzen (benotzt déi éischt passend Zeil, wéi och notPasswuertResetGuyPutz()).
+  const testPin = String(Math.floor(1000 + Math.random() * 9000));
+  let gesaztAnZeil = null;
+  for (let i = 1; i < werte.length; i++) {
+    if (String(werte[i][0] || "").trim().toLowerCase() === "guy putz") {
+      const salt = Utilities.getUuid();
+      const hash = hashPin(testPin, salt);
+      sheet.getRange(i + 1, 4, 1, 2).setValues([[hash, salt]]);
+      gesaztAnZeil = { zeil: i + 1, loginId: werte[i][0], hash, salt };
+      break;
+    }
+  }
+
+  // 3) Direkt probéieren, sech domadder unzemellen — frësch Daten liesen
+  //    (SpreadsheetApp.flush() fir sécher ze goen, datt de Schreif fäerdeg ass).
+  SpreadsheetApp.flush();
+  const loginResultat = gesaztAnZeil ? login(gesaztAnZeil.loginId, testPin) : { ok: false, error: "keng Zeil fonnt" };
+
+  const bericht = [
+    "Passend Zeilen (casse-insensitiv 'guy putz'): " + JSON.stringify(passendZeilen),
+    "Gesaat an Zeil: " + JSON.stringify(gesaztAnZeil),
+    "Test-PIN: " + testPin,
+    "Login-Resultat direkt duerno: " + JSON.stringify(loginResultat),
+  ].join("\n");
+  Logger.log(bericht);
+
+  try {
+    const ss = SpreadsheetApp.openById(OVERVIEW_SHEET_ID);
+    let debugSheet = ss.getSheetByName("Debug");
+    if (!debugSheet) {
+      debugSheet = ss.insertSheet("Debug");
+      debugSheet.appendRow(["Zäit", "Typ", "Feeler", "Stack"]);
+    }
+    debugSheet.appendRow([
+      Utilities.formatDate(new Date(), "Europe/Luxembourg", "dd.MM.yyyy HH:mm:ss"),
+      "notPasswuertResetUnitTest",
+      "Test-PIN: " + testPin + " — Login-Resultat: " + JSON.stringify(loginResultat),
+      bericht,
+    ]);
+  } catch (debugErr) { }
+}
+
+/**
  * Eemoleg Seed-Funktioun (schonn ausgefouert fir de Schoulufank 2026-27).
  * PINs ginn elo zoufälleg generéiert an am Log ausginn (net méi
  * hardcodéiert), well dëse Code op engem ëffentlechen Repo läit.
