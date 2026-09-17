@@ -334,6 +334,7 @@ function doPost(e) {
     }
     return jsonResponse({ ok: true, url, pdfUrl });
   } catch (err) {
+    Logger.log("doPost Feeler: " + err.message + "\nStack: " + err.stack);
     return jsonResponse({ ok: false, error: err.message });
   }
 }
