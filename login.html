@@ -54,6 +54,7 @@ function App() {
   const [pinSiichtbar, setPinSiichtbar] = useState(false);
   const [error, setError] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  const [proffen, setProffen] = useState([]);
 
   useEffect(() => {
     const bestehendToken = localStorage.getItem("ppren_token");
@@ -63,6 +64,14 @@ function App() {
       window.location.href = sécherZiel(zréckParam, bestehendRolle);
       return;
     }
+    // M2: Prof-Nimm als Dropdown lueden (ouni Login néideg), fir
+    // Tippfehler/Schreifweis-Ënnerscheeder beim Numm-Aginn auszeschléissen
+    // (z.B. "Guy Putz" vs. "Guy PUTZ" hu fréier zu engem falsche Login-
+    // Feeler gefouert).
+    fetch(WEB_APP_URL + "?proffen=1")
+      .then((r) => r.json())
+      .then((d) => setProffen(d.proffen || []))
+      .catch(() => {});
   }, []);
 
   const umellen = async () => {
@@ -122,6 +131,20 @@ function App() {
               onKeyDown={(e) => e.key === "Enter" && document.getElementById("pin-feld")?.focus()}
             />
           </label>
+
+          {proffen.length > 0 && (
+            <label className="field">
+              <span className="field-label">Oder als Prof auswielen</span>
+              <select
+                className="select"
+                value={proffen.includes(eingabe) ? eingabe : ""}
+                onChange={(e) => { if (e.target.value) setEingabe(e.target.value); }}
+              >
+                <option value="">– Prof auswielen –</option>
+                {proffen.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+          )}
 
           <label className="field">
             <span className="field-label">PIN oder Passwuert</span>
