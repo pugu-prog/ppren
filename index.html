@@ -46,10 +46,21 @@ async function sendeAnGoogleDrive(payload) {
   return data;
 }
 
+const GSE_THEMEN = [
+  { id: "buedem", label: "Buedem", icon: "🌱" },
+  { id: "loft", label: "Loft", icon: "💨" },
+  { id: "waasser", label: "Waasser", icon: "💧" },
+  { id: "offall", label: "Offall", icon: "♻️" },
+  { id: "mobiliteit", label: "Mobilitéit", icon: "🚲" },
+  { id: "energie", label: "Energie", icon: "⚡" },
+];
+const GSE_THEMEN_MAX = 3;
+
 const emptyPlan = () => ({
   betreuer: "",
   betreuer2: "",
   titel: "",
+  gseThemen: [],
   inhalt: "",
   motivation: "",
   ziele: "",
@@ -220,6 +231,7 @@ function App() {
     betreuer: LEHRER.find((l) => l.id === plan.betreuer)?.name || "",
     betreuer2: LEHRER.find((l) => l.id === plan.betreuer2)?.name || "",
     titel: plan.titel,
+    gseThemen: plan.gseThemen,
     inhalt: plan.inhalt,
     motivation: plan.motivation,
     ziele: plan.ziele,
@@ -328,6 +340,29 @@ function App() {
                   </Field>
                   <Field label="Projekttitel">
                     <input className="input" placeholder="z. B. Wasserqualität der Attert" value={plan.titel} onChange={(e) => update({ titel: e.target.value })} />
+                  </Field>
+                  <Field label="GSE-Thema(en)" hint={`1 bis ${GSE_THEMEN_MAX} Themen auswielen — erschéngt duerno op der GSE-Websäit`}>
+                    <div className="gse-themen-grid">
+                      {GSE_THEMEN.map((t) => {
+                        const aktiv = plan.gseThemen.includes(t.id);
+                        const disabled = !aktiv && plan.gseThemen.length >= GSE_THEMEN_MAX;
+                        return (
+                          <button
+                            key={t.id} type="button"
+                            className={`gse-thema-btn${aktiv ? " aktiv" : ""}`}
+                            disabled={disabled}
+                            onClick={() => update({
+                              gseThemen: aktiv
+                                ? plan.gseThemen.filter((id) => id !== t.id)
+                                : [...plan.gseThemen, t.id],
+                            })}
+                          >
+                            <span className="gse-thema-icon">{t.icon}</span>
+                            <span>{t.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </Field>
                 </section>
 
@@ -476,6 +511,11 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .select, .input, .textarea { border: 1px solid #c9d5cd; border-radius: 7px; padding: 8px 10px; font-size: 13.5px; font-family: inherit; background: #fff; color: #1c2621; }
 .input:disabled { background: #f1f3f1; color: #7a847e; }
 .textarea { resize: vertical; }
+.gse-themen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+.gse-thema-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; border: 1px solid #c9d5cd; border-radius: 10px; padding: 10px 6px; background: #fff; color: #1c2621; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.gse-thema-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.gse-thema-btn.aktiv { border-color: #00A94F; background: #eaf7ef; color: #00733a; }
+.gse-thema-icon { font-size: 20px; }
 .status-box { display: flex; flex-direction: column; gap: 6px; }
 .identitaet-box { font-size: 13.5px; font-weight: 700; color: #294f3c; background: #dfe9e2; padding: 10px 12px; border-radius: 8px; }
 .status-label { font-size: 11px; text-transform: uppercase; color: #6d7d74; font-weight: 700; }
