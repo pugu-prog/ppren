@@ -70,9 +70,24 @@
     });
   };
 
-  // Klengt Ofmell-Knäppchen um Rand vun der Säit derbäisetzen, sou datt
-  // et automatesch iwwerall do ass, ouni all Säit enzeel upassen ze mussen.
+  // Klengt Ofmell-Knäppchen a "Zréck zur Haaptsäit"-Link um Rand vun der Säit
+  // derbäisetzen, sou datt béid automatesch iwwerall do sinn, ouni all Säit
+  // enzeel upassen ze mussen. "links.html" routt sech selwer weider op
+  // proffen.html/schueler.html, jee no Roll.
   function fügOfmellKnäppchenBäi() {
+    const startLink = document.createElement("a");
+    startLink.textContent = "🏠 Haaptsäit";
+    startLink.href = "links.html";
+    startLink.style.cssText = [
+      "position:fixed", "bottom:12px", "left:12px", "z-index:9999",
+      "background:#00A94F", "color:#fff", "border:none", "border-radius:20px",
+      "padding:8px 14px", "font-size:11.5px", "font-weight:700",
+      "font-family:-apple-system,'Segoe UI',Inter,Arial,sans-serif",
+      "text-decoration:none", "cursor:pointer", "box-shadow:0 2px 8px rgba(0,0,0,0.25)", "opacity:0.85",
+    ].join(";");
+    startLink.onmouseenter = () => { startLink.style.opacity = "1"; };
+    startLink.onmouseleave = () => { startLink.style.opacity = "0.85"; };
+
     const knäppchen = document.createElement("button");
     knäppchen.textContent = "👤 " + numm + " · Ofmellen";
     knäppchen.setAttribute("onclick", "window.ppRenOfmellen()");
@@ -85,9 +100,14 @@
     ].join(";");
     knäppchen.onmouseenter = () => { knäppchen.style.opacity = "1"; };
     knäppchen.onmouseleave = () => { knäppchen.style.opacity = "0.85"; };
-    document.addEventListener("DOMContentLoaded", () => document.body.appendChild(knäppchen));
+
+    const bäisetzen = () => {
+      document.body.appendChild(startLink);
+      document.body.appendChild(knäppchen);
+    };
+    document.addEventListener("DOMContentLoaded", bäisetzen);
     if (document.readyState === "complete" || document.readyState === "interactive") {
-      setTimeout(() => document.body && document.body.appendChild(knäppchen), 0);
+      setTimeout(() => document.body && bäisetzen(), 0);
     }
   }
   fügOfmellKnäppchenBäi();
