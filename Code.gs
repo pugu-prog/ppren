@@ -71,6 +71,19 @@ function bewertungEntsperrenDialog() {
 }
 
 function doGet(e) {
+  // Ouni Login ofrufbar (fir de Login-Formulaire selwer, ier eng Session
+  // besteet) — gëtt bewosst NËMME Proffen-Nimm eraus, keng Klassen/Matrikelen/
+  // Schüler. Prof-Nimm sinn net esou sensibel wéi déi voll Schüler-Lëscht
+  // (déi ?namen=1 hei drënner gëtt, déi Login erfuerdert). Zweck: en
+  // zouverléissegen Dropdown beim Umellen, fir Tippfehler/Schreifweis-
+  // Ënnerscheeder (z.B. "Guy Putz" vs. "Guy PUTZ") auszeschléissen.
+  if (e.parameter && e.parameter.proffen === "1") {
+    const proffen = getAktivePersonen()
+      .filter((p) => p.rolle === "Prof")
+      .map((p) => p.numm);
+    return jsonResponse({ ok: true, proffen });
+  }
+
   const session = pruefSession(e.parameter && e.parameter.token);
 
   if (e.parameter && e.parameter.namen === "1") {
@@ -845,16 +858,19 @@ function personSpäicheren(data) {
   const virnumm = (data.virnumm || "").trim();
   const vollNumm = data.rolle === "Prof" ? loginId : "";
   const gewenschtPasswuertBestehend = (data.pin || "").trim();
+  const loginIdLower = loginId.toLowerCase();
   const sheet = getPersonenSheet();
   const werte = sheet.getDataRange().getValues();
   for (let i = 1; i < werte.length; i++) {
-    if (String(werte[i][0] || "").trim() === loginId) {
+    // Casse-insensitiv, fir keng Duplikater ze kreéieren, wa just d'Schreifweis
+    // ofwäicht (z.B. "Guy PUTZ" agi bei enger schonn existéierender "Guy Putz").
+    if (String(werte[i][0] || "").trim().toLowerCase() === loginIdLower) {
       sheet.getRange(i + 1, 1, 1, 7).setValues([[loginId, virnumm || werte[i][1], vollNumm, data.rolle, data.klasse || "", data.email || werte[i][5], "Jo"]]);
       const loginSheet = getLoginSheet();
       const loginWerte = loginSheet.getDataRange().getValues();
       let loginZeilIndex = -1;
       for (let j = 1; j < loginWerte.length; j++) {
-        if (String(loginWerte[j][0] || "").trim() === loginId) { loginZeilIndex = j; break; }
+        if (String(loginWerte[j][0] || "").trim().toLowerCase() === loginIdLower) { loginZeilIndex = j; break; }
       }
       let neiPin = null;
       if (loginZeilIndex === -1) {
@@ -902,13 +918,14 @@ function personenBulkSpäicheren(data) {
 
   const sheet = getPersonenSheet();
   const loginSheet = getLoginSheet();
-  const bestehendNimm = new Set(sheet.getDataRange().getValues().slice(1).map((z) => z[2]));
+  // Casse-insensitiv, fir keng Duplikater ze kreéieren (z.B. "Guy PUTZ" vs. "Guy Putz").
+  const bestehendNimm = new Set(sheet.getDataRange().getValues().slice(1).map((z) => String(z[2] || "").toLowerCase()));
   const resultater = [];
 
   zeilen.forEach((zeil) => {
     if (rolle === "Prof") {
       const loginId = zeil;
-      if (bestehendNimm.has(loginId)) {
+      if (bestehendNimm.has(loginId.toLowerCase())) {
         resultater.push({ numm: loginId, pin: null, status: "scho do" });
         return;
       }
@@ -2642,10 +2659,14 @@ function pinZuruecksetzen(numm, proffToken, neiesPasswuert) {
     return { ok: false, error: "Nëmme Proffen dierfen PINs/Passwierder änneren." };
   }
   const gesichtNumm = String(numm || "").trim();
+  const gesichtNummLower = gesichtNumm.toLowerCase();
   const sheet = getLoginSheet();
   const werte = sheet.getDataRange().getValues();
   for (let i = 1; i < werte.length; i++) {
-    if (String(werte[i][0] || "").trim() === gesichtNumm) {
+    // Casse-insensitiv, genau wéi login() — sou trëfft e Reset ëmmer déi
+    // selwecht Zeil, déi och beim Umellen benotzt gëtt, och wann d'Personen-
+    // Sheet eng aner Schreifweis huet (z.B. "Guy PUTZ" vs. "Guy Putz").
+    if (String(werte[i][0] || "").trim().toLowerCase() === gesichtNummLower) {
       const gewenschtPasswuert = (neiesPasswuert || "").trim();
       const pin = gewenschtPasswuert.length >= 6
         ? gewenschtPasswuert
