@@ -262,8 +262,9 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  let data;
   try {
-    const data = JSON.parse(e.postData.contents);
+    data = JSON.parse(e.postData.contents);
     let url;
     let pdfUrl;
     if (data.typ === "bewertung") {
@@ -335,6 +336,20 @@ function doPost(e) {
     return jsonResponse({ ok: true, url, pdfUrl });
   } catch (err) {
     Logger.log("doPost Feeler: " + err.message + "\nStack: " + err.stack);
+    try {
+      const ss = SpreadsheetApp.openById(OVERVIEW_SHEET_ID);
+      let debugSheet = ss.getSheetByName("Debug");
+      if (!debugSheet) {
+        debugSheet = ss.insertSheet("Debug");
+        debugSheet.appendRow(["Zäit", "Typ", "Feeler", "Stack"]);
+      }
+      debugSheet.appendRow([
+        Utilities.formatDate(new Date(), "Europe/Luxembourg", "dd.MM.yyyy HH:mm:ss"),
+        (data && data.typ) || "",
+        err.message,
+        err.stack || "",
+      ]);
+    } catch (debugErr) { }
     return jsonResponse({ ok: false, error: err.message });
   }
 }
