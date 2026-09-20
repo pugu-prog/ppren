@@ -55,12 +55,14 @@ const GSE_THEMEN = [
   { id: "energie", label: "Energie", icon: "⚡" },
 ];
 const GSE_THEMEN_MAX = 3;
+const RESUME_MAX = 500;
 
 const emptyPlan = () => ({
   betreuer: "",
   betreuer2: "",
   titel: "",
   gseThemen: [],
+  resume: "",
   inhalt: "",
   motivation: "",
   ziele: "",
@@ -164,7 +166,7 @@ function App() {
     setLoaded(false);
     try {
       const raw = localStorage.getItem(`projektplan:${schuelerId}`);
-      setPlan(raw ? JSON.parse(raw) : emptyPlan());
+      setPlan(raw ? { ...emptyPlan(), ...JSON.parse(raw) } : emptyPlan());
     } catch {
       setPlan(emptyPlan());
     } finally {
@@ -232,6 +234,7 @@ function App() {
     betreuer2: LEHRER.find((l) => l.id === plan.betreuer2)?.name || "",
     titel: plan.titel,
     gseThemen: plan.gseThemen,
+    resume: plan.resume,
     inhalt: plan.inhalt,
     motivation: plan.motivation,
     ziele: plan.ziele,
@@ -364,6 +367,12 @@ function App() {
                       })}
                     </div>
                   </Field>
+                  {plan.gseThemen.length > 0 && (
+                    <Field label="Résumé fir d'GSE-Websäit" hint={`Kuerz Zesummefaassung vum Projet (2-4 Sätz, max. ${RESUME_MAX} Zeechen). Gëtt ëffentlech op der GSE-Websäit gewisen — keng Nimm vu Persounen, keng perséinlech Donnéeën.`}>
+                      <textarea className="textarea" rows={4} maxLength={RESUME_MAX} placeholder="Wat baue/ënnersichen ech, a firwat ass et nohalteg?" value={plan.resume} onChange={(e) => update({ resume: e.target.value })} />
+                      <span className="field-hint">{plan.resume.length} / {RESUME_MAX}</span>
+                    </Field>
+                  )}
                 </section>
 
                 <section className="card">
