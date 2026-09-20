@@ -16,8 +16,8 @@
   .filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
   .filter button { border: 1px solid #c9d5cd; background: #fff; border-radius: 20px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; color: #294f3c; }
   .filter button.aktiv { background: #00A94F; border-color: #00A94F; color: #fff; }
-  .thema { margin-bottom: 26px; }
-  .thema h2 { font-size: 16px; margin: 0 0 10px; color: #294f3c; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .chips small { background: #e8f4ec; color: #294f3c; border-radius: 12px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
   .idee { background: #fff; border: 1px solid #e2e8e3; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
   .idee b { display: block; font-size: 14.5px; margin-bottom: 4px; }
   .idee span { display: block; font-size: 13px; color: #55625a; line-height: 1.45; margin-top: 6px; }
@@ -28,7 +28,7 @@
 <body>
 <header class="hero">
   <h1>💡 Projetsvirschléi</h1>
-  <p>Iddien, wou s de dech fir däi Projet inspiréiere kanns — gruppéiert no de 6 GSE-Themen.</p>
+  <p>Iddien, wou s de dech fir däi Projet inspiréiere kanns — mat de passenden GSE-Themen driwwer.</p>
 </header>
 <main class="content">
   <div class="filter" id="filter"></div>
@@ -38,7 +38,7 @@
   // Hei nei Virschléi derbäisetzen:
   //   { themen: ["buedem", ...], titel: "...", abschnitter: [["Label", "Text"], ...] }
   // themen: "buedem" | "loft" | "waasser" | "offall" | "mobiliteit" | "energie"
-  // (eng Iddi ka bei méi Themen erschéngen; abschnitter ass optional)
+  // (eng Iddi ka bei méi Themen gehéieren: si gëtt just 1x gewisen, d'Themen stinn driwwer; abschnitter ass optional)
   const IDEEN = [
     {
       themen: ["buedem", "offall", "loft"],
@@ -76,16 +76,16 @@
       box.innerHTML = '<div class="leer">Nach keng Virschléi do — si kommen geschwënn. 🌱</div>';
       return;
     }
-    const html = THEMEN
-      .filter((t) => aktiv === "all" || aktiv === t.id)
-      .map((t) => {
-        const lëscht = IDEEN.filter((i) => i.themen.includes(t.id));
-        if (lëscht.length === 0) return "";
-        return `<section class="thema"><h2>${t.icon} ${t.label}</h2>` +
-          lëscht.map((i) => `<div class="idee"><b>${esc(i.titel)}</b>${(i.abschnitter || []).map(([l, x]) => `<span><em>${esc(l)}:</em> ${esc(x)}</span>`).join("")}</div>`).join("") +
-          "</section>";
-      })
-      .join("");
+    const lëscht = IDEEN.filter((i) => aktiv === "all" || i.themen.includes(aktiv));
+    const html = lëscht.map((i) => {
+      const chips = i.themen
+        .map((id) => THEMEN.find((t) => t.id === id))
+        .filter(Boolean)
+        .map((t) => `<small>${t.icon} ${t.label}</small>`)
+        .join("");
+      return `<div class="idee"><div class="chips">${chips}</div><b>${esc(i.titel)}</b>` +
+        (i.abschnitter || []).map(([l, x]) => `<span><em>${esc(l)}:</em> ${esc(x)}</span>`).join("") + "</div>";
+    }).join("");
     box.innerHTML = html || '<div class="leer">Fir dëst Thema gëtt et nach keng Virschléi.</div>';
   }
   render();
