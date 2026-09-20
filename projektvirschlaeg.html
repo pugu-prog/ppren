@@ -20,7 +20,8 @@
   .thema h2 { font-size: 16px; margin: 0 0 10px; color: #294f3c; }
   .idee { background: #fff; border: 1px solid #e2e8e3; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
   .idee b { display: block; font-size: 14.5px; margin-bottom: 4px; }
-  .idee span { font-size: 13px; color: #55625a; line-height: 1.45; }
+  .idee span { display: block; font-size: 13px; color: #55625a; line-height: 1.45; margin-top: 6px; }
+  .idee span em { font-style: normal; font-weight: 700; color: #294f3c; }
   .leer { color: #6d7d74; font-size: 13.5px; background: #fff; border: 1px dashed #c9d5cd; border-radius: 12px; padding: 22px; text-align: center; }
 </style>
 </head>
@@ -34,9 +35,23 @@
   <div id="liste"></div>
 </main>
 <script>
-  // Hei nei Virschléi derbäisetzen: {thema, titel, text}
-  // thema: "buedem" | "loft" | "waasser" | "offall" | "mobiliteit" | "energie"
-  const IDEEN = [];
+  // Hei nei Virschléi derbäisetzen:
+  //   { themen: ["buedem", ...], titel: "...", abschnitter: [["Label", "Text"], ...] }
+  // themen: "buedem" | "loft" | "waasser" | "offall" | "mobiliteit" | "energie"
+  // (eng Iddi ka bei méi Themen erschéngen; abschnitter ass optional)
+  const IDEEN = [
+    {
+      themen: ["buedem", "offall", "loft"],
+      titel: "Nistkästen fir einheimesch Vullen am Arboretum vum LTEtt",
+      abschnitter: [
+        ["Kontext", "D'Arboretum vum LTEtt ass en Naturraum vu ronn 6 Hektar matten an Ettelbréck. Mat gezielt entwéckelten Nistkëschte soll de Liewensraum fir zu Lëtzebuerg bréiend Vullenaarten ënnerstëtzt an d'Biodiversitéit gefërdert ginn."],
+        ["Aufgab", "Wielt eng zu Lëtzebuerg bréiend Vullenaart aus, analyséiert hir ekologesch Besoinen an entwéckelt dofir en eegene funktionellen Nistkasten. Vum éischte Konzept iwwer den digitale Modell an de Prototyp bis zur Installatioun am Arboretum soll de ganze Prozess dokumentéiert ginn."],
+        ["Ziler", "Biologie a Biodiversitéit verstoen; technesch Ufuerderungen aus enger Recherche ofleeden; en 2D-/3D-Modell entwéckelen; e Prototyp hierstellen, testen a verbesseren; eng nohalteg an nobaulech Léisung dokumentéieren."],
+        ["Ofzeginn Aarbechten / Resultater", "Dokumentatioun vun der Vullenaart; Skizzen; digitalen 2D-/3D-Modell; Fabrikatiounspläng; Material- a Käschtenlëscht; funktionelle Prototyp; Montage- an Installatiounsuleedung; fräi zougänglech Donnéeë fir den Nobau; Installatioun am Arboretum vum LTEtt."],
+        ["Zäitplang", "Hierscht 2026: Recherche an Konzept. Wanter 2026/27: Design, digital Modelléierung a Prototyping. Spéitstens Fréijoer 2027: final Fabrikatioun an Installatioun vun den Nistkëschten am Arboretum."],
+      ],
+    },
+  ];
 
   const THEMEN = [
     { id: "buedem", label: "Buedem", icon: "🌱" },
@@ -64,10 +79,10 @@
     const html = THEMEN
       .filter((t) => aktiv === "all" || aktiv === t.id)
       .map((t) => {
-        const lëscht = IDEEN.filter((i) => i.thema === t.id);
+        const lëscht = IDEEN.filter((i) => i.themen.includes(t.id));
         if (lëscht.length === 0) return "";
         return `<section class="thema"><h2>${t.icon} ${t.label}</h2>` +
-          lëscht.map((i) => `<div class="idee"><b>${esc(i.titel)}</b>${i.text ? `<span>${esc(i.text)}</span>` : ""}</div>`).join("") +
+          lëscht.map((i) => `<div class="idee"><b>${esc(i.titel)}</b>${(i.abschnitter || []).map(([l, x]) => `<span><em>${esc(l)}:</em> ${esc(x)}</span>`).join("")}</div>`).join("") +
           "</section>";
       })
       .join("");
