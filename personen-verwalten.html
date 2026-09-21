@@ -50,13 +50,30 @@ function App() {
   const [resetSyncing, setResetSyncing] = useState(false);
   const [resetErgebnis, setResetErgebnis] = useState(null);
 
+  const [filtSuch, setFiltSuch] = useState("");
+  const [filtRolle, setFiltRolle] = useState("Alles");
+  const [filtKlasse, setFiltKlasse] = useState("Alles");
+  const [nurAktiv, setNurAktiv] = useState(true);
+  const [editNumm, setEditNumm] = useState(null);
+  const [editVirnumm, setEditVirnumm] = useState("");
+  const [editKlasse, setEditKlasse] = useState("1GSE");
+  const [editEmail, setEditEmail] = useState("");
+  const [editSyncing, setEditSyncing] = useState(false);
+  const [editError, setEditError] = useState(null);
+  const [backendAlt, setBackendAlt] = useState(false);
+
   const token = () => window.PPREN_SESSION?.token || "";
 
   const lade = () => {
     setLoading(true);
-    fetch(WEB_APP_URL + "?token=" + encodeURIComponent(token()))
+    fetch(WEB_APP_URL + "?personenVoll=1&token=" + encodeURIComponent(token()))
       .then((r) => r.json())
-      .then((d) => setPersonen(d.personen || []))
+      .then((d) => {
+        const l = d.personen || [];
+        // Wann de Backend (Apps Script) nach net nei deployt ass, feelen Email/aktiv
+        setBackendAlt(l.length > 0 && !("email" in l[0]));
+        setPersonen(l.map((p) => ({ ...p, aktiv: p.aktiv !== false, email: p.email || "" })));
+      })
       .finally(() => setLoading(false));
   };
   useEffect(() => { lade(); }, []);
@@ -134,7 +151,7 @@ function App() {
       await fetch(WEB_APP_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ typ: "personDeaktivéieren", proffToken: token(), numm: p.numm, aktiv: false }),
+        body: JSON.stringify({ typ: "personDeaktivéieren", proffToken: token(), numm: p.numm, aktiv: !p.aktiv }),
       });
       lade();
     } catch (e) { alert(e.message); }
@@ -196,6 +213,74 @@ function App() {
     a.download = `PPREN_Passwierder_${new Date().toISOString().slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const editOeffnen = (p) => {
+    setEditNumm(p.numm);
+    setEditVirnumm(p.virnumm || "");
+    setEditKlasse(p.klasse || "1GSE");
+    setEditEmail(p.email || "");
+    setEditError(null);
+  };
+
+  const editSpeicheren = async (p) => {
+    setEditSyncing(true);
+    setEditError(null);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          typ: "personDatenAendern", proffToken: token(), numm: p.numm,
+          virnumm: editVirnumm.trim(),
+          klasse: p.rolle === "Schüler" ? editKlasse : "",
+          email: editEmail.trim(),
+          aktiv: p.aktiv,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error);
+      setEditNumm(null);
+      lade();
+    } catch (e) {
+      setEditError(e.message);
+    } finally {
+      setEditSyncing(false);
+    }
+  };
+
+  const gefiltert = personen.filter((p) => {
+    if (nurAktiv && !p.aktiv) return false;
+    if (filtRolle !== "Alles" && p.rolle !== filtRolle) return false;
+    if (filtKlasse !== "Alles" && p.klasse !== filtKlasse) return false;
+    const q = filtSuch.trim().toLowerCase();
+    if (q && !((p.virnumm || "") + " " + p.numm + " " + (p.email || "")).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const csvEroflueden = () => {
+    const kopf = ["Virnumm", "Matrikel/Numm", "Roll", "Klasse", "Email", "Status"];
+    const cell = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+    const zeilen = gefiltert.map((p) => [p.virnumm, p.numm, p.rolle, p.klasse, p.email, p.aktiv ? "aktiv" : "deaktivéiert"].map(cell).join(";"));
+    const inhalt = "﻿" + [kopf.map(cell).join(";"), ...zeilen].join("\r\n");
+    const blob = new Blob([inhalt], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `PPREN_Persounen_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const emailenKopéieren = async () => {
+    const l = gefiltert.map((p) => p.email).filter(Boolean);
+    if (l.length === 0) { alert("Keng Emailen an der Auswiel."); return; }
+    try {
+      await navigator.clipboard.writeText(l.join("; "));
+      alert(l.length + " Email(en) kopéiert — elo an d'Mail-Programm asetzen.");
+    } catch (e) {
+      prompt("Emailen (kopéieren mat Cmd/Ctrl+C):", l.join("; "));
+    }
   };
 
   const anzuelNei = bulkResultater ? bulkResultater.filter((r) => r.status === "nei").length : 0;
@@ -313,52 +398,107 @@ function App() {
           )}
         </section>
 
-        <section className="card">
-          <h2>All Personen</h2>
+        <section className="card card-breed">
+          <h2>Persounen & Daten</h2>
+          <p className="hint">Hei kanns du all Persoun (Schüler a Proffen) mat Email ofruffen, ënnersichen, änneren an exportéieren. Nëmme Proffen gesinn dës Säit.</p>
+          {backendAlt && (
+            <p className="error">⚠️ De Backend (Apps Script) ass nach net aktualiséiert — Emailen a Status feelen nach. Deploy → Manage deployments → ✏️ → New version.</p>
+          )}
+          <div className="filterzeil">
+            <input className="input" placeholder="🔎 Sichen (Numm, Matrikel, Email)" value={filtSuch} onChange={(e) => setFiltSuch(e.target.value)} />
+            <select className="select" value={filtRolle} onChange={(e) => setFiltRolle(e.target.value)}>
+              <option value="Alles">Roll: Alles</option>
+              <option value="Schüler">Schüler</option>
+              <option value="Prof">Prof</option>
+            </select>
+            <select className="select" value={filtKlasse} onChange={(e) => setFiltKlasse(e.target.value)}>
+              <option value="Alles">Klass: Alles</option>
+              {KLASSEN.map((k) => <option key={k} value={k}>{k}</option>)}
+            </select>
+            <label className="check"><input type="checkbox" checked={nurAktiv} onChange={(e) => setNurAktiv(e.target.checked)} /> nëmmen aktiv</label>
+          </div>
+          <div className="filterzeil filterzeil-knäpp">
+            <span className="hint" style={{ margin: 0 }}>{gefiltert.length} vu {personen.length} Persoun(en)</span>
+            <span style={{ flex: 1 }} />
+            <button className="btn-klein" onClick={emailenKopéieren}>📧 Emailen kopéieren</button>
+            <button className="btn-klein" onClick={csvEroflueden}>⬇️ CSV / Excel</button>
+          </div>
           {loading && <p>Lädt…</p>}
           {!loading && (
-            <table className="tabelle">
-              <thead><tr><th>Virnumm</th><th>Matrikel/Numm</th><th>Roll</th><th>Klasse</th><th></th></tr></thead>
-              <tbody>
-                {personen.map((p, i) => (
-                  <React.Fragment key={i}>
-                    <tr>
-                      <td>{p.virnumm || "–"}</td><td>{p.numm}</td><td>{p.rolle}</td><td>{p.klasse || "–"}</td>
-                      <td className="aktioun-zell">
-                        <button className="icon-btn icon-btn-blo" onClick={() => passwuertAendernOeffnen(p)}>🔑 Passwuert</button>
-                        <button className="icon-btn" onClick={() => toggleAktiv(p)}>Deaktivéieren</button>
-                        <button className="icon-btn icon-btn-rout" onClick={() => permanentLaeschen(p)}>🗑️ Läschen</button>
-                      </td>
-                    </tr>
-                    {resetNumm === p.numm && (
-                      <tr className="reset-zeil">
-                        <td colSpan={5}>
-                          <div className="reset-box">
-                            <span className="reset-label">Neit Passwuert fir <strong>{p.virnumm ? `${p.virnumm} (${p.numm})` : p.numm}</strong> setzen:</span>
-                            <input
-                              className="input reset-input"
-                              type="text"
-                              value={resetPasswuert}
-                              onChange={(e) => setResetPasswuert(e.target.value)}
-                              placeholder="mindestens 6 Zeechen fir e stäerkert Passwuert, oder eidel fir automatesche 4-Zuel-PIN"
-                            />
-                            <button className="btn-klein" disabled={resetSyncing} onClick={passwuertAendernAbsenden}>
-                              {resetSyncing ? "…" : "Späicheren"}
-                            </button>
-                            <button className="btn-klein btn-klein-ghost" onClick={() => setResetNumm(null)}>Ofbriechen</button>
-                            {resetErgebnis && (
-                              <div className="reset-ergebnis">
-                                ✅ Neit Passwuert/PIN: <span className="pin-zuel-klein">{resetErgebnis}</span>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
+            <div className="tabelle-scroll">
+              <table className="tabelle">
+                <thead><tr><th>Virnumm</th><th>Matrikel/Numm</th><th>Roll</th><th>Klasse</th><th>Email</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                  {gefiltert.map((p) => (
+                    <React.Fragment key={p.numm}>
+                      {editNumm === p.numm ? (
+                        <tr className="edit-zeil">
+                          <td><input className="input" value={editVirnumm} onChange={(e) => setEditVirnumm(e.target.value)} placeholder={p.rolle === "Prof" ? "(optional)" : "Virnumm"} /></td>
+                          <td>{p.numm}</td>
+                          <td>{p.rolle}</td>
+                          <td>
+                            {p.rolle === "Schüler" ? (
+                              <select className="select" value={editKlasse} onChange={(e) => setEditKlasse(e.target.value)}>
+                                {KLASSEN.map((k) => <option key={k} value={k}>{k}</option>)}
+                              </select>
+                            ) : "–"}
+                          </td>
+                          <td><input className="input" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="name@lycee.lu" /></td>
+                          <td>{p.aktiv ? "aktiv" : "deaktivéiert"}</td>
+                          <td className="aktioun-zell">
+                            <button className="btn-klein" disabled={editSyncing} onClick={() => editSpeicheren(p)}>{editSyncing ? "…" : "Späicheren"}</button>
+                            <button className="btn-klein btn-klein-ghost" onClick={() => setEditNumm(null)}>Ofbriechen</button>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr className={p.aktiv ? "" : "inaktiv"}>
+                          <td>{p.virnumm || "–"}</td><td>{p.numm}</td><td>{p.rolle}</td><td>{p.klasse || "–"}</td>
+                          <td>{p.email || <span className="leer-email">– keng Email –</span>}</td>
+                          <td>{p.aktiv ? "aktiv" : "deaktivéiert"}</td>
+                          <td className="aktioun-zell">
+                            <button className="icon-btn icon-btn-gréng" onClick={() => editOeffnen(p)}>✏️ Änneren</button>
+                            <button className="icon-btn icon-btn-blo" onClick={() => passwuertAendernOeffnen(p)}>🔑 Passwuert</button>
+                            <button className="icon-btn" onClick={() => toggleAktiv(p)}>{p.aktiv ? "Deaktivéieren" : "Aktivéieren"}</button>
+                            <button className="icon-btn icon-btn-rout" onClick={() => permanentLaeschen(p)}>🗑️ Läschen</button>
+                          </td>
+                        </tr>
+                      )}
+                      {editNumm === p.numm && editError && (
+                        <tr className="reset-zeil"><td colSpan={7}><p className="error" style={{ margin: 0 }}>{editError}</p></td></tr>
+                      )}
+                      {resetNumm === p.numm && (
+                        <tr className="reset-zeil">
+                          <td colSpan={7}>
+                            <div className="reset-box">
+                              <span className="reset-label">Neit Passwuert fir <strong>{p.virnumm ? `${p.virnumm} (${p.numm})` : p.numm}</strong> setzen:</span>
+                              <input
+                                className="input reset-input"
+                                type="text"
+                                value={resetPasswuert}
+                                onChange={(e) => setResetPasswuert(e.target.value)}
+                                placeholder="mindestens 6 Zeechen fir e stäerkert Passwuert, oder eidel fir automatesche 4-Zuel-PIN"
+                              />
+                              <button className="btn-klein" disabled={resetSyncing} onClick={passwuertAendernAbsenden}>
+                                {resetSyncing ? "…" : "Späicheren"}
+                              </button>
+                              <button className="btn-klein btn-klein-ghost" onClick={() => setResetNumm(null)}>Ofbriechen</button>
+                              {resetErgebnis && (
+                                <div className="reset-ergebnis">
+                                  ✅ Neit Passwuert/PIN: <span className="pin-zuel-klein">{resetErgebnis}</span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+                  {gefiltert.length === 0 && (
+                    <tr><td colSpan={7} className="hint" style={{ textAlign: "center", padding: "18px" }}>Keng Persoun fonnt.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       </main>
@@ -370,7 +510,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 <style>
 * { box-sizing: border-box; } body { margin: 0; font-family: sans-serif; background: #f6f8f6; color: #1c2621; }
 .topbar { padding: 14px 22px; background: #00A94F; color: #fff; display: flex; gap: 10px; align-items: baseline; }
-.brand-mark { font-weight: 800; } .content { max-width: 640px; margin: 0 auto; padding: 24px 20px; }
+.brand-mark { font-weight: 800; } .content { max-width: 1080px; margin: 0 auto; padding: 24px 20px; }
+.card:not(.card-breed) { max-width: 640px; }
 .card { background: #fff; border: 1px solid #e2e8e3; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
 .download-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #eaf0f8; color: #294f3c; border: 1px solid #c3d3e6; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; font-weight: 600; flex-wrap: wrap; }
 .card h2 { color: #00A94F; margin-top: 0; }
@@ -403,6 +544,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 .btn-klein-ghost { background: #eef3ef; color: #294f3c; }
 .reset-ergebnis { width: 100%; font-size: 12.5px; color: #00A94F; font-weight: 700; }
 .pin-zuel-klein { font-size: 15px; letter-spacing: 2px; }
+.filterzeil { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.filterzeil .input { flex: 1; min-width: 200px; } .filterzeil .select { width: auto; }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: #294f3c; }
+.tabelle-scroll { overflow-x: auto; }
+.tabelle td .input, .tabelle td .select { padding: 5px 7px; font-size: 12.5px; min-width: 120px; }
+.edit-zeil td { background: #f3faf5; vertical-align: middle; }
+.inaktiv td { color: #98a39c; }
+.leer-email { color: #c7a03a; font-size: 12px; }
+.icon-btn-gréng { color: #1a7a46; background: #e6f5ec; }
 </style>
 </body>
 </html>
