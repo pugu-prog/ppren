@@ -257,7 +257,13 @@ function App() {
       const resultat = await sendeAnGoogleDrive(buildPayload(status));
       setDocUrl(resultat.url);
       setDocPdfUrl(resultat.pdfUrl || null);
-      setToast(status.startsWith("Frei") ? "Freigegeben. Gesperrt und mit Google Drive/Suivi synchronisiert." : "Projektplan eingereicht und mit Google Drive synchronisiert.");
+      setToast(
+        status.startsWith("Frei")
+          ? "Freigegeben. Gesperrt und mit Google Drive/Suivi synchronisiert."
+          : status === "Entwurf"
+          ? "Gespäichert a mat Google Drive synchroniséiert."
+          : "Projektplan eingereicht und mit Google Drive synchronisiert."
+      );
     } catch (e) {
       setSyncError("Konnte nicht mit Google Drive synchronisieren: " + e.message);
     } finally {
@@ -287,6 +293,7 @@ function App() {
     }
   };
 
+  const speicheren = () => senden("Entwurf");
   const einreichen = () => senden("Eingereicht – wartet auf Freigabe");
   const freigeben = () => senden("Freigegeben & digital unterschrieben");
 
@@ -510,6 +517,11 @@ function App() {
 
               <div className="actions">
                 {!locked && plan.status === "Entwurf" && (
+                  <button type="button" className="btn btn-ghost" disabled={!plan.titel.trim() || syncing} onClick={speicheren}>
+                    {syncing ? "Späichert…" : "💾 Späicheren"}
+                  </button>
+                )}
+                {!locked && plan.status === "Entwurf" && (
                   <button className="btn btn-primary" disabled={!canSubmit || syncing} onClick={einreichen}>
                     {syncing ? "Sendet an Google Drive…" : "Zur Genehmigung einreichen"}
                   </button>
@@ -524,6 +536,11 @@ function App() {
                 {docUrl && <a className="doc-link" href={docUrl} target="_blank" rel="noreferrer">📄 Word öffnen ↗</a>}
                 {docPdfUrl && <a className="doc-link" href={docPdfUrl} target="_blank" rel="noreferrer">📕 PDF öffnen ↗</a>}
               </div>
+              {!locked && plan.status === "Entwurf" && (
+                <p className="field-hint" style={{ margin: "-6px 0 14px" }}>
+                  💾 <strong>Späicheren</strong> synchroniséiert de Plang mat Google Drive (den Betreier kann en dann nokucken), bleift awer op „Entwurf" — du kanns nach weiderschaffen. <strong>„Zur Genehmigung einreichen"</strong> spaart de Plang fir de Betreier a gëtt gespaart, bis en en nees opmécht.
+                </p>
+              )}
               {syncError && <div className="sync-error">{syncError}</div>}
             </>
           )}
