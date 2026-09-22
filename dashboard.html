@@ -56,6 +56,10 @@ function App() {
     fetch(WEB_APP_URL + "?token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""))
       .then((res) => res.json())
       .then((data) => {
+        if (!data.ok) {
+          setError(data.error || "Konnte Übersicht nicht laden.");
+          return;
+        }
         setProjekte(data.projekte || []);
         setBewertungen(data.bewertungen || []);
         setWochenberichte(data.wochenberichte || []);
