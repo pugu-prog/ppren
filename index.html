@@ -115,6 +115,30 @@ function App() {
       alert(`${keys.length} lokale Projektplang-Entwërf geläscht.`);
       window.location.href = window.location.pathname;
     }
+    // Fir de Fall, wou d'Sendung um Server net duerchgaangen ass, mä de
+    // Plang trotzdem lokal um Status "Eingereicht"/"Freigegeben" bleift a
+    // sech dofir net méi änneren léisst: setzt just DE STATUS vum aktuell
+    // ugemellte Schüler zréck op "Entwurf", ouni seng agedroe Donnéeën
+    // unzeréieren. Opruff: index.html?reopen=mir
+    if (params.get("reopen") === "mir") {
+      const numm = window.PPREN_SESSION?.numm;
+      if (numm) {
+        try {
+          const raw = localStorage.getItem(`projektplan:${numm}`);
+          if (raw) {
+            const p = JSON.parse(raw);
+            p.status = "Entwurf";
+            localStorage.setItem(`projektplan:${numm}`, JSON.stringify(p));
+            alert("Däi Projektplang ass rem opgemaach. Du kanns elo weiderschaffen an nach eng Kéier areechen.");
+          } else {
+            alert("Et gouf kee lokale Projektplang fonnt fir dëse Compte op dësem Gerät/Browser.");
+          }
+        } catch (e) {
+          alert("Feeler beim Zrécksetzen: " + e.message);
+        }
+      }
+      window.location.href = window.location.pathname;
+    }
   }, []);
 
   const istSchueler = window.PPREN_SESSION?.rolle === "Schüler";
@@ -250,11 +274,15 @@ function App() {
   });
 
   const senden = async (status) => {
-    update({ status });
     setSyncing(true);
     setSyncError(null);
     try {
       const resultat = await sendeAnGoogleDrive(buildPayload(status));
+      // Den Status gëtt bewosst eréischt HEI, no engem erfollegräichen
+      // Backend-Send, geännert — sou kann d'Formulaire nëmmen dann gespaart
+      // ginn, wann de Plang wierklech beim Prof ukomm ass. Feelt de Send,
+      // bleift alles um Status "Entwurf" a bleift editéierbar.
+      update({ status });
       setDocUrl(resultat.url);
       setDocPdfUrl(resultat.pdfUrl || null);
       setToast(
