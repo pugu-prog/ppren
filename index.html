@@ -180,8 +180,6 @@ function App() {
   const [docUrl, setDocUrl] = useState(null);
   const [docPdfUrl, setDocPdfUrl] = useState(null);
   const [msSyncInfo, setMsSyncInfo] = useState(null);
-  const [resumeLaed, setResumeLaed] = useState(false);
-  const [resumeFehler, setResumeFehler] = useState(null);
 
   const storageKey = schuelerId ? `projektplan:${schuelerId}` : null;
   const saving = useDebouncedSave(loaded ? storageKey : null, plan);
@@ -300,27 +298,6 @@ function App() {
     }
   };
 
-  const resumeGeneréieren = async () => {
-    if (plan.resume.trim() && !confirm("Dat aktuellt Résumé gëtt duerch en neien ersat. Weiderfueren?")) return;
-    setResumeLaed(true);
-    setResumeFehler(null);
-    try {
-      const r = await sendeAnGoogleDrive({
-        typ: "resumeGeneréieren",
-        token: window.PPREN_SESSION?.token || "",
-        titel: plan.titel,
-        inhalt: plan.inhalt,
-        ziele: plan.ziele,
-        gseThemen: plan.gseThemen,
-      });
-      update({ resume: (r.resume || "").slice(0, RESUME_MAX) });
-    } catch (e) {
-      setResumeFehler(e.message);
-    } finally {
-      setResumeLaed(false);
-    }
-  };
-
   const speicheren = () => senden("Entwurf");
   const einreichen = () => senden("Eingereicht – wartet auf Freigabe");
   const freigeben = () => senden("Freigegeben & digital unterschrieben");
@@ -402,7 +379,7 @@ function App() {
                   <Field label="Projekttitel">
                     <input className="input" placeholder="z. B. Wasserqualität der Attert" value={plan.titel} onChange={(e) => update({ titel: e.target.value })} />
                   </Field>
-                  <Field label="GSE-Thema(en)" hint={`1 bis ${GSE_THEMEN_MAX} Themen auswielen — erschéngt duerno op der GSE-Websäit`}>
+                  <Field label="GSE-Thema(en)" hint={`1 bis ${GSE_THEMEN_MAX} Themen auswielen — erschéngt duerno op der GSE-Websäit. D'Résumé fir d'GSE-Websäit gëtt duerno vum Betreier geschriwwen, dofir gëtt et hei net verlaangt.`}>
                     <div className="gse-themen-grid">
                       {GSE_THEMEN.map((t) => {
                         const aktiv = plan.gseThemen.includes(t.id);
@@ -425,23 +402,6 @@ function App() {
                       })}
                     </div>
                   </Field>
-                  {plan.gseThemen.length > 0 && (
-                    <Field label="Résumé fir d'GSE-Websäit" hint={`Zesummefaassung vum Projet (ongeféier 4-8 Sätz, max. ${RESUME_MAX} Zeechen). Gëtt ëffentlech op der GSE-Websäit gewisen — keng Nimm vu Persounen, keng perséinlech Donnéeën.`}>
-                      <textarea className="textarea" rows={10} maxLength={RESUME_MAX} placeholder="Wat baue/ënnersichen ech, a firwat ass et nohalteg?" value={plan.resume} onChange={(e) => update({ resume: e.target.value })} />
-                      <span className="field-hint">{plan.resume.length} / {RESUME_MAX}</span>
-                    </Field>
-                  )}
-                  {plan.gseThemen.length > 0 && (
-                    <div className="resume-aktioun">
-                      <button type="button" className="btn-ki" disabled={resumeLaed || plan.inhalt.trim().length < 40} onClick={resumeGeneréieren}>
-                        {resumeLaed ? "Generéiert…" : "✨ Résumé vun der KI generéieren"}
-                      </button>
-                      <span className="field-hint">
-                        Baséiert op Titel, Inhalt a Ziele (fëll déi fir d'éischt aus). Kuck de Text duerch an ännert en — hie gëtt ëffentlech gewisen, dofir keng Nimm a keng perséinlech Donnéeën. Vum Prof gëtt hie virun der Publikatioun nach kontrolléiert.
-                      </span>
-                    </div>
-                  )}
-                  {resumeFehler && <div className="sync-error" style={{ margin: "0 0 12px" }}>{resumeFehler}</div>}
                 </section>
 
                 <section className="card">
@@ -639,9 +599,6 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .pending-note { font-size: 13px; color: #8a5a12; font-weight: 600; background: #fbe8c6; padding: 8px 12px; border-radius: 8px; line-height: 1.5; }
 .doc-link { font-size: 13px; font-weight: 700; color: #00A94F; text-decoration: none; }
 .sync-error { color: #8a2b1f; font-size: 12.5px; background: #fbe4e1; padding: 8px 12px; border-radius: 8px; margin: -6px 22px 20px; }
-.resume-aktioun { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: -4px 0 14px; }
-.btn-ki { font-size: 13px; font-weight: 700; padding: 8px 14px; border-radius: 8px; border: 1px solid #b9a5e8; background: #f1ecfb; color: #4a2f8f; cursor: pointer; }
-.btn-ki:disabled { opacity: 0.5; cursor: not-allowed; }
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1c2621; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; }
 </style>
 </body>
