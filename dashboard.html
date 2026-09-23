@@ -51,6 +51,9 @@ function App() {
   const [genehmegId, setGenehmegId] = useState(null);
   const [wiedereroeffnenId, setWiedereroeffnenId] = useState(null);
   const [expandedSchueler, setExpandedSchueler] = useState(null);
+  const [kommentarModal, setKommentarModal] = useState(null);
+  const [kommentarModalText, setKommentarModalText] = useState("");
+  const [kommentarModalSenden, setKommentarModalSenden] = useState(false);
 
   const lade = () => {
     setLoading(true);
@@ -93,45 +96,56 @@ function App() {
     }
   };
 
-  const wiedereroeffnen = async (schueler) => {
-    const kommentar = prompt(
-      `Projektplang vun "${schueler}" zréck op Entwurf setzen, sou datt hie/si nees änneren kann.\n\nOptionale Kommentar fir de Schüler (gëtt him/hir am Formulaire ugewisen) — oder eidel loossen a just OK drécken. Ofbriechen mat Cancel.`,
-      ""
-    );
-    if (kommentar === null) return;
-    setWiedereroeffnenId(schueler);
-    try {
-      const res = await fetch(WEB_APP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ typ: "projektplanWiedereroeffnen", proffToken: window.PPREN_SESSION?.token || "", schueler, kommentar: kommentar.trim() }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
-      setProjekte((ps) => ps.map((p) => (p.Schüler === schueler ? { ...p, Status: "Entwurf" } : p)));
-      if (kommentar.trim()) lade();
-    } catch (e) {
-      alert("Konnte net zréck op Entwurf setzen: " + e.message);
-    } finally {
-      setWiedereroeffnenId(null);
-    }
+  // "wiedereroeffnen" a "kommentarHinzefuegen" benotzen elo béid ee gemeinsamt
+  // Fënster (kommentarModal) mat engem grousse Textfeld, amplaz vum wénzege
+  // native prompt()-Popup, dat just eng Zeil weist.
+  const oeffneKommentarModal = (schueler, klasse, mode) => {
+    setKommentarModal({ schueler, klasse, mode });
+    setKommentarModalText("");
   };
 
-  const kommentarHinzefuegen = async (schueler, klasse) => {
-    const text = prompt(`Kommentar fir "${schueler}" (gëtt him/hir am Projektplang-Formulaire ugewisen):`, "");
-    if (!text || !text.trim()) return;
+  const schliesKommentarModal = () => {
+    if (kommentarModalSenden) return;
+    setKommentarModal(null);
+    setKommentarModalText("");
+  };
+
+  const kommentarModalAbschécken = async () => {
+    if (!kommentarModal) return;
+    const { schueler, klasse, mode } = kommentarModal;
+    const text = kommentarModalText.trim();
+    if (mode === "add" && !text) return;
+    setKommentarModalSenden(true);
     try {
-      const res = await fetch(WEB_APP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ typ: "plangKommentarHinzefuegen", token: window.PPREN_SESSION?.token || "", schueler, klasse, text: text.trim() }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
-      setExpandedSchueler(schueler);
-      lade();
+      if (mode === "reopen") {
+        setWiedereroeffnenId(schueler);
+        const res = await fetch(WEB_APP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ typ: "projektplanWiedereroeffnen", proffToken: window.PPREN_SESSION?.token || "", schueler, kommentar: text }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+        setProjekte((ps) => ps.map((p) => (p.Schüler === schueler ? { ...p, Status: "Entwurf" } : p)));
+        if (text) lade();
+      } else {
+        const res = await fetch(WEB_APP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ typ: "plangKommentarHinzefuegen", token: window.PPREN_SESSION?.token || "", schueler, klasse, text }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+        setExpandedSchueler(schueler);
+        lade();
+      }
+      setKommentarModal(null);
+      setKommentarModalText("");
     } catch (e) {
-      alert("Konnte de Kommentar net späicheren: " + e.message);
+      alert(mode === "reopen" ? "Konnte net zréck op Entwurf setzen: " + e.message : "Konnte de Kommentar net späicheren: " + e.message);
+    } finally {
+      setWiedereroeffnenId(null);
+      setKommentarModalSenden(false);
     }
   };
 
@@ -276,7 +290,7 @@ function App() {
                               {oppen > 0 ? `🟠 ${oppen} oppen` : `✅ ${ks.length}`}
                             </button>
                           )}
-                          <button type="button" className="btn-gen" onClick={() => kommentarHinzefuegen(p.Schüler, p.Klasse)} title="Kommentar derbäisetzen">
+                          <button type="button" className="btn-gen" onClick={() => oeffneKommentarModal(p.Schüler, p.Klasse, "add")} title="Kommentar derbäisetzen">
                             💬 +
                           </button>
                         </div>
@@ -286,7 +300,7 @@ function App() {
                           <button
                             className="btn-gen btn-gen-warn"
                             disabled={wiedereroeffnenId === p.Schüler}
-                            onClick={() => wiedereroeffnen(p.Schüler)}
+                            onClick={() => oeffneKommentarModal(p.Schüler, p.Klasse, "reopen")}
                             title="Projektplang zréck op Entwurf setzen, sou datt de Schüler nees änneren kann"
                           >
                             {wiedereroeffnenId === p.Schüler ? "…" : "🔓 Wiedereröffnen"}
@@ -429,6 +443,49 @@ function App() {
           </table>
         )}
       </main>
+
+      {kommentarModal && (
+        <div className="modal-overlay" onClick={schliesKommentarModal}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3>
+              {kommentarModal.mode === "reopen"
+                ? `Projektplang vun "${kommentarModal.schueler}" zréck op Entwurf setzen`
+                : `Kommentar fir "${kommentarModal.schueler}"`}
+            </h3>
+            <p className="modal-hint">
+              {kommentarModal.mode === "reopen"
+                ? "Optionale Kommentar fir de Schüler (gëtt him/hir am Formulaire ugewisen) — kann och eidel bleiwen."
+                : "Gëtt him/hir am Projektplang-Formulaire ugewisen. De Schüler kann en duerno als „geännert“ markéieren."}
+            </p>
+            <textarea
+              className="modal-textarea"
+              rows={10}
+              autoFocus
+              value={kommentarModalText}
+              onChange={(e) => setKommentarModalText(e.target.value)}
+              placeholder="Kommentar schreiwen…"
+              disabled={kommentarModalSenden}
+            />
+            <div className="modal-actions">
+              <button type="button" className="btn-gen" onClick={schliesKommentarModal} disabled={kommentarModalSenden}>
+                Ofbriechen
+              </button>
+              <button
+                type="button"
+                className="btn-gen btn-gen-primary"
+                onClick={kommentarModalAbschécken}
+                disabled={kommentarModalSenden || (kommentarModal.mode === "add" && !kommentarModalText.trim())}
+              >
+                {kommentarModalSenden
+                  ? "…"
+                  : kommentarModal.mode === "reopen"
+                  ? "Zréck op Entwurf setzen"
+                  : "Kommentar späicheren"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -490,6 +547,14 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .kommentar-row-mini.erledegt .kommentar-text-mini { text-decoration: line-through; color: #6d7d74; }
 .kommentar-text-mini { display: block; font-size: 13px; color: #1c2621; white-space: pre-wrap; }
 .kommentar-meta-mini { display: block; font-size: 11px; color: #6d7d74; margin-top: 2px; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(28,38,33,0.45); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 100; }
+.modal-box { background: #fff; border-radius: 14px; padding: 22px 24px; width: 100%; max-width: 560px; box-shadow: 0 12px 40px rgba(0,0,0,0.25); }
+.modal-box h3 { margin: 0 0 8px; font-size: 16px; color: #1c2621; }
+.modal-hint { margin: 0 0 12px; font-size: 12.5px; color: #6d7d74; line-height: 1.4; }
+.modal-textarea { width: 100%; min-height: 180px; border: 1px solid #c9d5cd; border-radius: 8px; padding: 10px 12px; font-size: 14px; font-family: inherit; resize: vertical; box-sizing: border-box; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.btn-gen-primary { color: #fff; background: #00A94F; border-color: #00A94F; }
+.btn-gen-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
 </body>
 </html>
