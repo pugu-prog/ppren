@@ -41,6 +41,7 @@ function App() {
   const [wochenberichte, setWochenberichte] = useState([]);
   const [budget, setBudget] = useState([]);
   const [ausgaben, setAusgaben] = useState([]);
+  const [plangKommentarer, setPlangKommentarer] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterKlasse, setFilterKlasse] = useState("alle");
@@ -49,6 +50,7 @@ function App() {
   const [aendernId, setAendernId] = useState(null);
   const [genehmegId, setGenehmegId] = useState(null);
   const [wiedereroeffnenId, setWiedereroeffnenId] = useState(null);
+  const [expandedSchueler, setExpandedSchueler] = useState(null);
 
   const lade = () => {
     setLoading(true);
@@ -65,6 +67,7 @@ function App() {
         setWochenberichte(data.wochenberichte || []);
         setBudget(data.budget || []);
         setAusgaben(data.ausgaben || []);
+        setPlangKommentarer(data.plangKommentarer || []);
       })
       .catch(() => setError("Konnte Übersicht nicht laden."))
       .finally(() => setLoading(false));
@@ -91,23 +94,48 @@ function App() {
   };
 
   const wiedereroeffnen = async (schueler) => {
-    if (!confirm(`Projektplang vun "${schueler}" wierklech zréck op Entwurf setzen? De Schüler kann duerno nees änneren.`)) return;
+    const kommentar = prompt(
+      `Projektplang vun "${schueler}" zréck op Entwurf setzen, sou datt hie/si nees änneren kann.\n\nOptionale Kommentar fir de Schüler (gëtt him/hir am Formulaire ugewisen) — oder eidel loossen a just OK drécken. Ofbriechen mat Cancel.`,
+      ""
+    );
+    if (kommentar === null) return;
     setWiedereroeffnenId(schueler);
     try {
       const res = await fetch(WEB_APP_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ typ: "projektplanWiedereroeffnen", proffToken: window.PPREN_SESSION?.token || "", schueler }),
+        body: JSON.stringify({ typ: "projektplanWiedereroeffnen", proffToken: window.PPREN_SESSION?.token || "", schueler, kommentar: kommentar.trim() }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
       setProjekte((ps) => ps.map((p) => (p.Schüler === schueler ? { ...p, Status: "Entwurf" } : p)));
+      if (kommentar.trim()) lade();
     } catch (e) {
       alert("Konnte net zréck op Entwurf setzen: " + e.message);
     } finally {
       setWiedereroeffnenId(null);
     }
   };
+
+  const kommentarHinzefuegen = async (schueler, klasse) => {
+    const text = prompt(`Kommentar fir "${schueler}" (gëtt him/hir am Projektplang-Formulaire ugewisen):`, "");
+    if (!text || !text.trim()) return;
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ typ: "plangKommentarHinzefuegen", token: window.PPREN_SESSION?.token || "", schueler, klasse, text: text.trim() }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      setExpandedSchueler(schueler);
+      lade();
+    } catch (e) {
+      alert("Konnte de Kommentar net späicheren: " + e.message);
+    }
+  };
+
+  const kommentarerFuer = (schueler) => plangKommentarer.filter((k) => k.Schüler === schueler);
 
   const ausgiFuer = (schueler) => ausgaben.filter((a) => a.Schüler === schueler).reduce((s, a) => s + (Number(a.Betrag) || 0), 0);
 
@@ -210,42 +238,82 @@ function App() {
           <table className="table">
             <thead>
               <tr>
-                <th>Schüler/-in</th><th>Klasse</th><th>Betreuer/-in</th><th>Titel</th><th>Status</th><th>Zuletzt aktualisiert</th><th>Projektplan</th><th>Suivi</th><th>Dokumentatioun</th><th></th>
+                <th>Schüler/-in</th><th>Klasse</th><th>Betreuer/-in</th><th>Titel</th><th>Status</th><th>Zuletzt aktualisiert</th><th>Projektplan</th><th>Suivi</th><th>Dokumentatioun</th><th>Kommentarer</th><th></th>
               </tr>
             </thead>
             <tbody>
               {gefiltert.map((p, i) => {
                 const meta = statusMeta(p.Status);
+                const ks = kommentarerFuer(p.Schüler);
+                const oppen = ks.filter((k) => k.Erledegt !== "Jo").length;
+                const expanded = expandedSchueler === p.Schüler;
                 return (
-                  <tr key={i}>
-                    <td className="cell-strong">{p.Schüler}</td>
-                    <td>{p.Klasse}</td>
-                    <td>{p.Betreuer}</td>
-                    <td className="cell-muted">{p.Titel || "–"}</td>
-                    <td><span className={`pill pill-${meta.key}`}>{meta.label}</span></td>
-                    <td className="cell-muted">{p["Zuletzt aktualisiert"]}</td>
-                    <td className="link-cell">
-                      {p["Projektplan-Link"] ? <a className="link" href={p["Projektplan-Link"]} target="_blank" rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
-                      {p["Projektplan-PDF-Link"] && <a className="link link-pdf" href={p["Projektplan-PDF-Link"]} target="_blank" rel="noreferrer">PDF ↗</a>}
-                    </td>
-                    <td className="link-cell">
-                      {p["Suivi-Link"] ? <a className="link" href={p["Suivi-Link"]} target="_blank" rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
-                      {p["Suivi-PDF-Link (Schüler)"] && <a className="link link-pdf" href={p["Suivi-PDF-Link (Schüler)"]} target="_blank" rel="noreferrer">PDF ↗</a>}
-                    </td>
-                    <td>{p["Dokumentatioun-Link"] ? <a className="link" href={p["Dokumentatioun-Link"]} target="_blank" rel="noreferrer">SharePoint ↗</a> : <span className="cell-muted">–</span>}</td>
-                    <td>
-                      {(meta.key === "pending" || meta.key === "done") && (
-                        <button
-                          className="btn-gen btn-gen-warn"
-                          disabled={wiedereroeffnenId === p.Schüler}
-                          onClick={() => wiedereroeffnen(p.Schüler)}
-                          title="Projektplang zréck op Entwurf setzen, sou datt de Schüler nees änneren kann"
-                        >
-                          {wiedereroeffnenId === p.Schüler ? "…" : "🔓 Wiedereröffnen"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                  <React.Fragment key={i}>
+                    <tr>
+                      <td className="cell-strong">{p.Schüler}</td>
+                      <td>{p.Klasse}</td>
+                      <td>{p.Betreuer}</td>
+                      <td className="cell-muted">{p.Titel || "–"}</td>
+                      <td><span className={`pill pill-${meta.key}`}>{meta.label}</span></td>
+                      <td className="cell-muted">{p["Zuletzt aktualisiert"]}</td>
+                      <td className="link-cell">
+                        {p["Projektplan-Link"] ? <a className="link" href={p["Projektplan-Link"]} target="_blank" rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
+                        {p["Projektplan-PDF-Link"] && <a className="link link-pdf" href={p["Projektplan-PDF-Link"]} target="_blank" rel="noreferrer">PDF ↗</a>}
+                      </td>
+                      <td className="link-cell">
+                        {p["Suivi-Link"] ? <a className="link" href={p["Suivi-Link"]} target="_blank" rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
+                        {p["Suivi-PDF-Link (Schüler)"] && <a className="link link-pdf" href={p["Suivi-PDF-Link (Schüler)"]} target="_blank" rel="noreferrer">PDF ↗</a>}
+                      </td>
+                      <td>{p["Dokumentatioun-Link"] ? <a className="link" href={p["Dokumentatioun-Link"]} target="_blank" rel="noreferrer">SharePoint ↗</a> : <span className="cell-muted">–</span>}</td>
+                      <td>
+                        <div className="kommentar-cell">
+                          {ks.length > 0 && (
+                            <button
+                              type="button"
+                              className={`kommentar-toggle${oppen > 0 ? " oppen" : ""}`}
+                              onClick={() => setExpandedSchueler(expanded ? null : p.Schüler)}
+                            >
+                              {oppen > 0 ? `🟠 ${oppen} oppen` : `✅ ${ks.length}`}
+                            </button>
+                          )}
+                          <button type="button" className="btn-gen" onClick={() => kommentarHinzefuegen(p.Schüler, p.Klasse)} title="Kommentar derbäisetzen">
+                            💬 +
+                          </button>
+                        </div>
+                      </td>
+                      <td>
+                        {(meta.key === "pending" || meta.key === "done") && (
+                          <button
+                            className="btn-gen btn-gen-warn"
+                            disabled={wiedereroeffnenId === p.Schüler}
+                            onClick={() => wiedereroeffnen(p.Schüler)}
+                            title="Projektplang zréck op Entwurf setzen, sou datt de Schüler nees änneren kann"
+                          >
+                            {wiedereroeffnenId === p.Schüler ? "…" : "🔓 Wiedereröffnen"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                    {expanded && (
+                      <tr>
+                        <td colSpan="11" className="kommentar-expand">
+                          {ks.length === 0 ? (
+                            <span className="cell-muted">Nach keng Kommentarer.</span>
+                          ) : (
+                            [...ks].reverse().map((k) => (
+                              <div key={k.ID} className={`kommentar-row-mini${k.Erledegt === "Jo" ? " erledegt" : ""}`}>
+                                <span className="kommentar-text-mini">{k.Text}</span>
+                                <span className="kommentar-meta-mini">
+                                  {k.VunProf} · {k.Erstallt}
+                                  {k.Erledegt === "Jo" ? ` · ✅ vum Schüler als geännert markéiert (${k.ErledegtZait})` : " · ⏳ nach net markéiert"}
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -413,6 +481,15 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .btn-gen { font-size: 11.5px; font-weight: 700; color: #00A94F; background: #eef3ef; border: 1px solid #c9d5cd; padding: 6px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
 .btn-gen:disabled { opacity: 0.6; cursor: wait; }
 .btn-gen-warn { color: #8a5a12; background: #fbe8c6; border-color: #f0d29a; }
+.kommentar-cell { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.kommentar-toggle { font-size: 11px; font-weight: 700; color: #294f3c; background: #eef3ef; border: 1px solid #c9d5cd; padding: 4px 9px; border-radius: 20px; cursor: pointer; white-space: nowrap; }
+.kommentar-toggle.oppen { color: #8a5a12; background: #fbe8c6; border-color: #f0d29a; }
+.kommentar-expand { background: #fffaf0; padding: 14px 18px; }
+.kommentar-row-mini { padding: 8px 0; border-bottom: 1px solid #f0e4cc; }
+.kommentar-row-mini:last-child { border-bottom: none; }
+.kommentar-row-mini.erledegt .kommentar-text-mini { text-decoration: line-through; color: #6d7d74; }
+.kommentar-text-mini { display: block; font-size: 13px; color: #1c2621; white-space: pre-wrap; }
+.kommentar-meta-mini { display: block; font-size: 11px; color: #6d7d74; margin-top: 2px; }
 </style>
 </body>
 </html>
