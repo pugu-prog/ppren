@@ -180,6 +180,8 @@ function App() {
   const [docUrl, setDocUrl] = useState(null);
   const [docPdfUrl, setDocPdfUrl] = useState(null);
   const [msSyncInfo, setMsSyncInfo] = useState(null);
+  const [kommentarer, setKommentarer] = useState([]);
+  const [kommentarAendertId, setKommentarAendertId] = useState(null);
 
   const storageKey = schuelerId ? `projektplan:${schuelerId}` : null;
   const saving = useDebouncedSave(loaded ? storageKey : null, plan);
@@ -203,6 +205,8 @@ function App() {
     fetch(WEB_APP_URL + "?token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""))
       .then((res) => res.json())
       .then((data) => {
+        setKommentarer((data.plangKommentarer || []).filter((k) => k.Schüler === currentSchueler.name));
+
         const eintrag = (data.meilensteng || []).find((m) => m.Schüler === currentSchueler.name);
         if (!eintrag || !eintrag["Meilensteng (JSON)"]) return;
         let gespäichert = [];
@@ -298,6 +302,18 @@ function App() {
     }
   };
 
+  const kommentarErledegtSetzen = async (id, erledegt) => {
+    setKommentarAendertId(id);
+    try {
+      await sendeAnGoogleDrive({ typ: "plangKommentarErledegt", token: window.PPREN_SESSION?.token || "", id, erledegt });
+      setKommentarer((ks) => ks.map((k) => (k.ID === id ? { ...k, Erledegt: erledegt ? "Jo" : "Nee" } : k)));
+    } catch (e) {
+      alert("Konnte de Kommentar-Status net änneren: " + e.message);
+    } finally {
+      setKommentarAendertId(null);
+    }
+  };
+
   const speicheren = () => senden("Entwurf");
   const einreichen = () => senden("Eingereicht – wartet auf Freigabe");
   const freigeben = () => senden("Freigegeben & digital unterschrieben");
@@ -358,6 +374,31 @@ function App() {
 
           {schuelerId && (
             <>
+              {kommentarer.length > 0 && (
+                <section className="card kommentar-card">
+                  <h2>💬 Kommentarer vum Betreier</h2>
+                  <div className="kommentar-list">
+                    {[...kommentarer].reverse().sort((a, b) => (a.Erledegt === "Jo" ? 1 : 0) - (b.Erledegt === "Jo" ? 1 : 0)).map((k) => {
+                      const erledegt = k.Erledegt === "Jo";
+                      return (
+                        <div key={k.ID} className={`kommentar-row${erledegt ? " erledegt" : ""}`}>
+                          <div className="kommentar-text">{k.Text}</div>
+                          <div className="kommentar-meta">{k.VunProf} · {k.Erstallt}</div>
+                          <label className="kommentar-check">
+                            <input
+                              type="checkbox"
+                              checked={erledegt}
+                              disabled={kommentarAendertId === k.ID}
+                              onChange={(e) => kommentarErledegtSetzen(k.ID, e.target.checked)}
+                            />
+                            <span>{erledegt ? "Geännert" : "Ass geännert"}</span>
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
               <fieldset disabled={locked || plan.status.startsWith("Eingereicht")} className="form">
                 <section className="card">
                   <h2>1. Grunddaten</h2>
@@ -599,6 +640,14 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .pending-note { font-size: 13px; color: #8a5a12; font-weight: 600; background: #fbe8c6; padding: 8px 12px; border-radius: 8px; line-height: 1.5; }
 .doc-link { font-size: 13px; font-weight: 700; color: #00A94F; text-decoration: none; }
 .sync-error { color: #8a2b1f; font-size: 12.5px; background: #fbe4e1; padding: 8px 12px; border-radius: 8px; margin: -6px 22px 20px; }
+.kommentar-card { border-color: #f0d29a; background: #fffaf0; }
+.kommentar-list { display: flex; flex-direction: column; gap: 10px; }
+.kommentar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; border-left: 3px solid #d99a2b; background: #fff; padding: 10px 14px; border-radius: 8px; }
+.kommentar-row.erledegt { border-left-color: #9db6a7; opacity: 0.7; }
+.kommentar-text { flex: 1 1 100%; font-size: 13.5px; color: #1c2621; white-space: pre-wrap; }
+.kommentar-row.erledegt .kommentar-text { text-decoration: line-through; color: #6d7d74; }
+.kommentar-meta { font-size: 11.5px; color: #6d7d74; }
+.kommentar-check { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #294f3c; cursor: pointer; margin-left: auto; }
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1c2621; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; }
 </style>
 </body>
