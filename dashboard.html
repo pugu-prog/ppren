@@ -223,13 +223,13 @@ function App() {
       </header>
 
       <div className="tools-row">
-        <a className="tool-link" href="suivi.html" target="_blank">📖 Suivien vun de Schüler</a>
-        <a className="tool-link" href="bewertung.html" target="_blank">📊 Bewertung</a>
-        <a className="tool-link" href="fachgespraech.html" target="_blank">🗣️ Fachgespréich</a>
-        <a className="tool-link" href="zieluewerpreiwung.html" target="_blank">🎯 Ziler iwwerpréiwen</a>
-        <a className="tool-link" href="wochenberichte-korrigeieren.html" target="_blank">📋 Wochenberichter</a>
-        <a className="tool-link" href="rendezvousen.html" target="_blank">📅 Rendez-vousen plangen</a>
-        <a className="tool-link" href="zeitplang-verwalten.html" target="_blank">🔒 Zäitplang verwalten</a>
+        <a className="tool-link" href="suivi.html">📖 Suivien vun de Schüler</a>
+        <a className="tool-link" href="bewertung.html">📊 Bewertung</a>
+        <a className="tool-link" href="fachgespraech.html">🗣️ Fachgespréich</a>
+        <a className="tool-link" href="zieluewerpreiwung.html">🎯 Ziler iwwerpréiwen</a>
+        <a className="tool-link" href="wochenberichte-korrigeieren.html">📋 Wochenberichter</a>
+        <a className="tool-link" href="rendezvousen.html">📅 Rendez-vousen plangen</a>
+        <a className="tool-link" href="zeitplang-verwalten.html">🔒 Zäitplang verwalten</a>
         <a className="tool-link" href="#budget">💰 Budget genehmegen</a>
       </div>
 
@@ -294,12 +294,12 @@ function App() {
                       <td><span className={`pill pill-${meta.key}`}>{meta.label}</span></td>
                       <td className="cell-muted">{p["Zuletzt aktualisiert"]}</td>
                       <td className="link-cell">
-                        {p["Projektplan-Link"] ? <a className="link" href={p["Projektplan-Link"]} target="_blank" rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
-                        {p["Projektplan-PDF-Link"] && <a className="link link-pdf" href={p["Projektplan-PDF-Link"]} target="_blank" rel="noreferrer">PDF ↗</a>}
+                        {p["Projektplan-Link"] ? <a className="link" href={p["Projektplan-Link"]} rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
+                        {p["Projektplan-PDF-Link"] && <a className="link link-pdf" href={p["Projektplan-PDF-Link"]} rel="noreferrer">PDF ↗</a>}
                       </td>
                       <td className="link-cell">
-                        {p["Suivi-Link"] ? <a className="link" href={p["Suivi-Link"]} target="_blank" rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
-                        {p["Suivi-PDF-Link (Schüler)"] && <a className="link link-pdf" href={p["Suivi-PDF-Link (Schüler)"]} target="_blank" rel="noreferrer">PDF ↗</a>}
+                        {p["Suivi-Link"] ? <a className="link" href={p["Suivi-Link"]} rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
+                        {p["Suivi-PDF-Link (Schüler)"] && <a className="link link-pdf" href={p["Suivi-PDF-Link (Schüler)"]} rel="noreferrer">PDF ↗</a>}
                         <button
                           type="button"
                           className="btn-gen btn-gen-icon"
@@ -310,7 +310,7 @@ function App() {
                           {suiviPdfId === p.Schüler ? "…" : "📄"}
                         </button>
                       </td>
-                      <td>{p["Dokumentatioun-Link"] ? <a className="link" href={p["Dokumentatioun-Link"]} target="_blank" rel="noreferrer">SharePoint ↗</a> : <span className="cell-muted">–</span>}</td>
+                      <td>{p["Dokumentatioun-Link"] ? <a className="link" href={p["Dokumentatioun-Link"]} rel="noreferrer">SharePoint ↗</a> : <span className="cell-muted">–</span>}</td>
                       <td>
                         <div className="kommentar-cell">
                           {ks.length > 0 && (
@@ -398,8 +398,8 @@ function App() {
                       </select>
                     </td>
                     <td className="link-cell">
-                      {b["Suivi-Link"] ? <a className="link" href={b["Suivi-Link"]} target="_blank" rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
-                      {b["Suivi-PDF-Link (Schüler)"] && <a className="link link-pdf" href={b["Suivi-PDF-Link (Schüler)"]} target="_blank" rel="noreferrer">PDF ↗</a>}
+                      {b["Suivi-Link"] ? <a className="link" href={b["Suivi-Link"]} rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
+                      {b["Suivi-PDF-Link (Schüler)"] && <a className="link link-pdf" href={b["Suivi-PDF-Link (Schüler)"]} rel="noreferrer">PDF ↗</a>}
                       <button
                         type="button"
                         className="btn-gen btn-gen-icon"
@@ -456,7 +456,7 @@ function App() {
       <h2 className="section-titel">Wochenberichter</h2>
       <main className="table-wrap">
         <div className="wb-link-row">
-          <a className="link-btn" href="wochenberichte-korrigeieren.html" target="_blank">📋 Alleguer korrigéieren →</a>
+          <a className="link-btn" href="wochenberichte-korrigeieren.html">📋 Alleguer korrigéieren →</a>
         </div>
         {!loading && !error && wochenberichte.length === 0 && <div className="empty">Nach keng Wochenberichter ofginn.</div>}
         {!loading && !error && wochenberichte.length > 0 && (
