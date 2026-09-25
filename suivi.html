@@ -113,6 +113,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [geladen, setGeladen] = useState(false);
+  const [suiviPdfGenerating, setSuiviPdfGenerating] = useState(false);
 
   const currentSchueler = SCHUELER.find((s) => s.id === schuelerId);
   const istGSE2 = currentSchueler?.klasse === "2GSE";
@@ -158,6 +159,28 @@ function App() {
       .catch(() => setError("Konnte Daten nicht laden."))
       .finally(() => { setLoading(false); setGeladen(true); });
   }, [schuelerId]);
+
+  // Erstellt/aktualiséiert de Suivi-PDF (Deckblat + Kapitel 1 + all finaliséiert
+  // Bewertungen) direkt aus dësem Tool eraus, onofhängeg vun enger Bewertungs-
+  // Finaliséierung. Nëmmen Proffen dierfen dat (kontrolléiert am Backend).
+  const suiviPdfGeneréieren = async () => {
+    if (!currentSchueler) return;
+    setSuiviPdfGenerating(true);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ typ: "suiviPdfGeneréieren", token: window.PPREN_SESSION?.token || "", schueler: currentSchueler.name }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      setProjekt((p) => (p ? { ...p, "Suivi-PDF-Link (Schüler)": data.url } : p));
+    } catch (e) {
+      alert("Konnte de Suivi-PDF net generéieren: " + e.message);
+    } finally {
+      setSuiviPdfGenerating(false);
+    }
+  };
 
   // WICHTEG: Just eng VALIDÉIERT (finalisiert) Bewertung gëtt hei ugewisen —
   // en Entworf (Status "Entwurf") ass just fir de Prof am Bewertungs-Tool
@@ -359,10 +382,18 @@ function App() {
 
               <div className="link-row">
                 {projekt?.["Projektplan-Link"] && (
-                  <a className="btn btn-ghost" href={projekt["Projektplan-Link"]} target="_blank" rel="noreferrer">📝 Projektplan als Word öffnen</a>
+                  <a className="btn btn-ghost" href={projekt["Projektplan-Link"]} rel="noreferrer">📝 Projektplan als Word öffnen</a>
                 )}
                 {projekt?.["Dokumentatioun-Link"] && (
-                  <a className="btn btn-ghost" href={projekt["Dokumentatioun-Link"]} target="_blank" rel="noreferrer">🔗 Dokumentatioun opmaachen</a>
+                  <a className="btn btn-ghost" href={projekt["Dokumentatioun-Link"]} rel="noreferrer">🔗 Dokumentatioun opmaachen</a>
+                )}
+                {projekt?.["Suivi-PDF-Link (Schüler)"] && (
+                  <a className="btn btn-ghost" href={projekt["Suivi-PDF-Link (Schüler)"]} rel="noreferrer">📄 Suivi als PDF opmaachen</a>
+                )}
+                {!istSchueler && projekt && (
+                  <button type="button" className="btn btn-ghost" disabled={suiviPdfGenerating} onClick={suiviPdfGeneréieren}>
+                    {suiviPdfGenerating ? "…" : "📄 Suivi-PDF generéieren"}
+                  </button>
                 )}
               </div>
             </section>
@@ -399,7 +430,7 @@ function App() {
               })()}
 
               <div className="link-row">
-                <a className="btn btn-ghost" href="budget.html" target="_blank" rel="noreferrer">💰 Budget-Tool opmaachen</a>
+                <a className="btn btn-ghost" href="budget.html" rel="noreferrer">💰 Budget-Tool opmaachen</a>
               </div>
             </section>
 
@@ -440,7 +471,7 @@ function App() {
                 </>
               )}
               <div className="link-row">
-                <a className="btn btn-ghost" href="wochenbericht.html" target="_blank" rel="noreferrer">📝 Wochenbericht-Tool opmaachen</a>
+                <a className="btn btn-ghost" href="wochenbericht.html" rel="noreferrer">📝 Wochenbericht-Tool opmaachen</a>
               </div>
             </section>
 
@@ -681,7 +712,7 @@ function App() {
                       )}
 
                       {b["Suivi-PDF-Link (Schüler)"] && (
-                        <a className="btn btn-primary" href={b["Suivi-PDF-Link (Schüler)"]} target="_blank" rel="noreferrer">
+                        <a className="btn btn-primary" href={b["Suivi-PDF-Link (Schüler)"]} rel="noreferrer">
                           📄 Ganzen Suivi als PDF opmaachen
                         </a>
                       )}
@@ -718,10 +749,11 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .klasse-btn { font-size: 12.5px; font-weight: 700; padding: 7px 14px; border-radius: 20px; border: 1px solid #c9d5cd; background: #fff; color: #55625a; cursor: pointer; }
 .klasse-btn.active { background: #00A94F; border-color: #00A94F; color: #fff; }
 .status-line { font-size: 13.5px; color: #55625a; margin: 0 0 16px; }
-.link-row { display: flex; gap: 10px; margin-top: 16px; }
+.link-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
 .btn { display: inline-block; font-size: 13.5px; font-weight: 700; padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; text-decoration: none; }
 .btn-primary { background: #00A94F; color: #fff; margin-top: 14px; }
 .btn-ghost { background: #eef3ef; color: #00A94F; }
+.btn-ghost:disabled { opacity: 0.6; cursor: wait; }
 .notice { background: #fbe8c6; color: #8a5a12; font-size: 13px; padding: 12px 14px; border-radius: 8px; line-height: 1.5; margin: 0; }
 .empty { padding: 30px; text-align: center; color: #6d7d74; font-size: 14px; background: #fff; border-radius: 12px; border: 1px solid #e2e8e3; }
 .error { color: #8a2b1f; }
