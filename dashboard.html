@@ -300,17 +300,15 @@ function App() {
                       <td className="link-cell">
                         {p["Suivi-Link"] ? <a className="link" href={p["Suivi-Link"]} target="_blank" rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
                         {p["Suivi-PDF-Link (Schüler)"] && <a className="link link-pdf" href={p["Suivi-PDF-Link (Schüler)"]} target="_blank" rel="noreferrer">PDF ↗</a>}
-                        {p["Suivi-Link"] && (
-                          <button
-                            type="button"
-                            className="btn-gen btn-gen-icon"
-                            disabled={suiviPdfId === p.Schüler}
-                            onClick={() => suiviPdfGeneréieren(p.Schüler)}
-                            title="Suivi-PDF (nei) generéieren"
-                          >
-                            {suiviPdfId === p.Schüler ? "…" : "📄"}
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          className="btn-gen btn-gen-icon"
+                          disabled={suiviPdfId === p.Schüler}
+                          onClick={() => suiviPdfGeneréieren(p.Schüler)}
+                          title="Suivi-PDF (nei) generéieren"
+                        >
+                          {suiviPdfId === p.Schüler ? "…" : "📄"}
+                        </button>
                       </td>
                       <td>{p["Dokumentatioun-Link"] ? <a className="link" href={p["Dokumentatioun-Link"]} target="_blank" rel="noreferrer">SharePoint ↗</a> : <span className="cell-muted">–</span>}</td>
                       <td>
@@ -402,17 +400,15 @@ function App() {
                     <td className="link-cell">
                       {b["Suivi-Link"] ? <a className="link" href={b["Suivi-Link"]} target="_blank" rel="noreferrer">Word ↗</a> : <span className="cell-muted">–</span>}
                       {b["Suivi-PDF-Link (Schüler)"] && <a className="link link-pdf" href={b["Suivi-PDF-Link (Schüler)"]} target="_blank" rel="noreferrer">PDF ↗</a>}
-                      {b["Suivi-Link"] && (
-                        <button
-                          type="button"
-                          className="btn-gen btn-gen-icon"
-                          disabled={suiviPdfId === b.Schüler}
-                          onClick={() => suiviPdfGeneréieren(b.Schüler)}
-                          title="Suivi-PDF (nei) generéieren"
-                        >
-                          {suiviPdfId === b.Schüler ? "…" : "📄"}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="btn-gen btn-gen-icon"
+                        disabled={suiviPdfId === b.Schüler}
+                        onClick={() => suiviPdfGeneréieren(b.Schüler)}
+                        title="Suivi-PDF (nei) generéieren"
+                      >
+                        {suiviPdfId === b.Schüler ? "…" : "📄"}
+                      </button>
                     </td>
                   </tr>
                 );
