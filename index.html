@@ -183,6 +183,7 @@ function App() {
   const [kommentarer, setKommentarer] = useState([]);
   const [kommentarAendertId, setKommentarAendertId] = useState(null);
   const [serverSync, setServerSync] = useState(null);
+  const [statusReopenedNotice, setStatusReopenedNotice] = useState(false);
 
   const storageKey = schuelerId ? `projektplan:${schuelerId}` : null;
   const saving = useDebouncedSave(loaded ? storageKey : null, plan);
@@ -216,14 +217,28 @@ function App() {
         const projektZeil = (data.projekte || []).find((p) => p.Schüler === currentSchueler.name);
         if (projektZeil) {
           setPlan((p) => {
-            if (p.titel && p.titel.trim()) return p; // lokale Donnéeën hunn Virrang
+            const serverStatus = projektZeil.Status || p.status;
+            // De STATUS muss ëmmer vum Server kommen, och wann lokal Inhalt
+            // scho do ass: nëmmen de Server weess zouverléisseg, ob de Prof
+            // de Plang rem opgemaach ("Wiedereröffnen") oder fräigeschalt
+            // huet -- dat läit ausserhalb vun dësem Browser/Gerät. Ouni dëst
+            // blouf en op engem aneren Apparat rem opgemaachte Plang hei
+            // fälschlecherweis gespaart, well nëmmen den ale lokale Status
+            // benotzt gouf. (Feeler gemellt: "Projektplang net méi
+            // accessible obwuel rem opgemaach" — 2026-09-28.)
+            if (p.titel && p.titel.trim()) {
+              if (serverStatus === p.status) return p;
+              setServerSync(new Date());
+              if (serverStatus === "Entwurf" && p.status !== "Entwurf") setStatusReopenedNotice(true);
+              return { ...p, status: serverStatus };
+            }
             let details = {};
             try { details = JSON.parse(projektZeil["Projektplan-Details (JSON)"] || "{}"); } catch { details = {}; }
             setServerSync(new Date());
             return {
               ...p,
               titel: projektZeil.Titel || p.titel,
-              status: projektZeil.Status || p.status,
+              status: serverStatus,
               betreuer: details.betreuer || p.betreuer,
               betreuer2: details.betreuer2 || p.betreuer2,
               inhalt: details.inhalt || p.inhalt,
@@ -410,6 +425,11 @@ function App() {
 
           {schuelerId && (
             <>
+              {statusReopenedNotice && (
+                <p className="notice notice-sync" style={{ marginBottom: "14px" }}>
+                  🔓 Däi Betreier huet de Projektplang rem opgemaach — du kanns elo weiderschaffen an nach eng Kéier areechen.
+                </p>
+              )}
               {serverSync && (
                 <p className="field-hint" style={{ margin: "-4px 0 14px" }}>
                   ☁️ Inhalt vum Server geluede (leschte gespäicherte Stand, well op dësem Gerät nach kee lokale Entworf war).
@@ -689,6 +709,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .kommentar-row.erledegt .kommentar-text { text-decoration: line-through; color: #6d7d74; }
 .kommentar-meta { font-size: 11.5px; color: #6d7d74; }
 .kommentar-check { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #294f3c; cursor: pointer; margin-left: auto; }
+.notice { font-size: 12.5px; padding: 10px 14px; border-radius: 8px; line-height: 1.5; }
+.notice-sync { background: #eaf7ef; color: #00733a; }
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1c2621; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; }
 </style>
 </body>
