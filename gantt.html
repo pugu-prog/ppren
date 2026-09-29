@@ -60,16 +60,23 @@ function ersteDatumVunWoche(wocheLabel) {
 }
 
 function App() {
+  const istSchueler = window.PPREN_SESSION?.rolle === "Schüler";
   const urlParams = new URLSearchParams(window.location.search);
-  const urlSchueler = urlParams.get("schueler");
+  // De "schueler"-URL-Parameter gëtt nëmmen fir de Prof benotzt (Deep-Link
+  // aus dem Dashboard/Planungstool). En Login als Schüler kritt IMMER just
+  // seng eege Date ze gesinn, egal wat an der URL steet. (Feeler gemellt:
+  // "Schüler gesäit aner Schüler hir Planung" — 2026-09-29.)
+  const urlSchueler = istSchueler ? null : urlParams.get("schueler");
 
   // M1: Nimm live vum Backend lueden, keng hart-codéiert Lëscht méi.
   const [personen, setPersonen] = useState([]);
+  const [personenGelueden, setPersonenGelueden] = useState(false);
   useEffect(() => {
     fetch(WEB_APP_URL + "?namen=1&token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""))
       .then((r) => r.json())
       .then((d) => setPersonen(d.personen || []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setPersonenGelueden(true));
   }, []);
   const SCHUELER = useMemo(
     () => personen.filter((p) => p.rolle === "Schüler").map((p) => ({ id: p.numm, name: p.numm, klasse: p.klasse })),
@@ -77,7 +84,13 @@ function App() {
   );
 
   const [schuelerId, setSchuelerId] = useState(urlSchueler || "");
-  const [gespaart, setGespaart] = useState(!!urlSchueler);
+  const [gespaart, setGespaart] = useState(istSchueler || !!urlSchueler);
+  useEffect(() => {
+    if (!personenGelueden || !istSchueler || schuelerId) return;
+    const numm = window.PPREN_SESSION?.numm;
+    if (numm && SCHUELER.find((s) => s.id === numm)) setSchuelerId(numm);
+    // eslint-disable-next-line
+  }, [personenGelueden, istSchueler, SCHUELER]);
   const [meilensteng, setMeilensteng] = useState([]);
   const [wochenberichte, setWochenberichte] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -151,7 +164,7 @@ function App() {
           {gespaart && currentSchueler ? (
             <div className="gespaart-row">
               <span className="gespaart-label">👤 {currentSchueler.name} ({currentSchueler.klasse})</span>
-              <button className="link-btn-klein" onClick={() => setGespaart(false)}>Net dee/déi hei? Wiesselen</button>
+              {!istSchueler && <button className="link-btn-klein" onClick={() => setGespaart(false)}>Net dee/déi hei? Wiesselen</button>}
             </div>
           ) : (
             <label className="field">
