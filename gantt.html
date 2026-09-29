@@ -27,9 +27,9 @@ const { useState, useEffect, useMemo } = React;
 
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
 
-const KATEGORIE_OPTIONEN = ["Event", "Iwwerpréiwung", "Praktesch Phase", "Ofgab", "Eegen", "Vakanz"];
-const KATEGORIE_FARWEN = { "Event": "#f0ec3a", "Iwwerpréiwung": "#d9d3f5", "Praktesch Phase": "#1ecdc4", "Ofgab": "#a9d92d", "Eegen": "#F67E1B", "Vakanz": "#b3d9e8" };
-const KATEGORIE_TEXT = { "Event": "#1c2621", "Iwwerpréiwung": "#1c2621", "Praktesch Phase": "#04342c", "Ofgab": "#1c2621", "Eegen": "#ffffff", "Vakanz": "#1c4a5e" };
+const KATEGORIE_OPTIONEN = ["Event", "Iwwerpréiwung", "Praktesch Phase", "Ofgab", "Eegen", "Projektplang", "Vakanz"];
+const KATEGORIE_FARWEN = { "Event": "#f0ec3a", "Iwwerpréiwung": "#d9d3f5", "Praktesch Phase": "#1ecdc4", "Ofgab": "#a9d92d", "Eegen": "#F67E1B", "Projektplang": "#5b9bd5", "Vakanz": "#b3d9e8" };
+const KATEGORIE_TEXT = { "Event": "#1c2621", "Iwwerpréiwung": "#1c2621", "Praktesch Phase": "#04342c", "Ofgab": "#1c2621", "Eegen": "#ffffff", "Projektplang": "#ffffff", "Vakanz": "#1c4a5e" };
 const STATUS_RAND = { "Ausstoend": "transparent", "Erreecht": "#00A94F", "Verspéit": "#e8483a" };
 const WB_FARWEN = { "Bewäert": "#00A94F", "Agereecht": "#4576B5", "Verpasst": "#e8483a", "Entschëllegt": "#93a098" };
 
@@ -121,10 +121,15 @@ function App() {
           });
         // Ale Kopie-Duplikater aus der Zäit virun der quell-Ëmstellung erausfilteren
         const offiziellSchlëssel = new Set(offiziell.map((o) => o.datum + "|" + o.titel));
+        // Projektplang-Meilensteng (aus dem Projektplang-Formulaire, index.html)
+        // hu virdru guer net am Gantt-Chart mat opgedaucht -- nëmmen "Eegen"
+        // gouf ugewisen. (Feeler gemellt: "Meilensteine vun de Schüler ginn
+        // net automatesch an de Gantt-Chart" — 2026-09-29.)
+        const projektplang = gespäichert.filter((m) => m.quell === "Projektplang");
         const eegen = gespäichert
           .filter((m) => (m.quell || "Eegen") === "Eegen")
           .filter((m) => !offiziellSchlëssel.has(m.datum + "|" + m.titel));
-        setMeilensteng([...offiziell, ...eegen, ...VAKANZ_ZEILEN]);
+        setMeilensteng([...offiziell, ...projektplang, ...eegen, ...VAKANZ_ZEILEN]);
         setWochenberichte((data.wochenberichte || []).filter((w) => w.Schüler === s.name));
       })
       .catch(() => setError("Konnte Meilensteng net lueden."))
@@ -209,7 +214,7 @@ function App() {
                   return (
                   <div key={idx} className={`gantt-row ${istVakanz ? "gantt-row-vakanz" : ""}`}>
                     <div className="gantt-row-label">
-                      <span className="gantt-titel">{m.quell === "Offiziell" ? "🔒 " : ""}{istVakanz ? "🏖️ " : ""}{m.titel || "(ouni Titel)"}</span>
+                      <span className="gantt-titel">{m.quell === "Offiziell" ? "🔒 " : ""}{m.quell === "Projektplang" ? "📝 " : ""}{istVakanz ? "🏖️ " : ""}{m.titel || "(ouni Titel)"}</span>
                       <span className="gantt-datum">
                         {istVakanz
                           ? `${new Date(m.datum).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })} – ${new Date(m.datumEnn).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}`
