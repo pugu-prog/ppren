@@ -69,16 +69,25 @@ const VAKANZ_ZEILEN = VAKANZEN_2026_27.map((v) => ({
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
 function App() {
+  const istSchueler = window.PPREN_SESSION?.rolle === "Schüler";
   const urlParams = new URLSearchParams(window.location.search);
-  const urlSchueler = urlParams.get("schueler");
+  // De "schueler"-URL-Parameter gëtt nëmmen fir de Prof benotzt (Deep-Link
+  // aus dem Dashboard/Gantt). En Login als Schüler kritt IMMER just seng
+  // eege Date ze gesinn, egal wat an der URL steet — soss kéint ee just
+  // duerch d'Ännere vun der URL d'Planung vun engem anere Schüler gesinn
+  // oder änneren. (Feeler gemellt: "Schüler gesäit aner Schüler hir
+  // Planung" — 2026-09-29.)
+  const urlSchueler = istSchueler ? null : urlParams.get("schueler");
 
   // M1: Nimm live vum Backend lueden, keng hart-codéiert Lëscht méi.
   const [personen, setPersonen] = useState([]);
+  const [personenGelueden, setPersonenGelueden] = useState(false);
   useEffect(() => {
     fetch(WEB_APP_URL + "?namen=1&token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""))
       .then((r) => r.json())
       .then((d) => setPersonen(d.personen || []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setPersonenGelueden(true));
   }, []);
   const SCHUELER = useMemo(
     () => personen.filter((p) => p.rolle === "Schüler").map((p) => ({ id: p.numm, name: p.numm, klasse: p.klasse })),
@@ -86,7 +95,13 @@ function App() {
   );
 
   const [schuelerId, setSchuelerId] = useState(urlSchueler || "");
-  const [gespaart, setGespaart] = useState(!!urlSchueler);
+  const [gespaart, setGespaart] = useState(istSchueler || !!urlSchueler);
+  useEffect(() => {
+    if (!personenGelueden || !istSchueler || schuelerId) return;
+    const numm = window.PPREN_SESSION?.numm;
+    if (numm && SCHUELER.find((s) => s.id === numm)) setSchuelerId(numm);
+    // eslint-disable-next-line
+  }, [personenGelueden, istSchueler, SCHUELER]);
   const [eegenMeilensteng, setEegenMeilensteng] = useState([]); // nëmmen eege, editéierbar
   const [offiziell, setOffiziell] = useState([]); // vum Server, nëmmen liesen
   const [projektplang, setProjektplang] = useState([]); // Projektplang-Meilensteng, Status/Notiz editéierbar
@@ -105,7 +120,7 @@ function App() {
   // Meilensteng-Zeil vum Schüler mat enger eideler JSON iwwerschriwwen
   // (speichereMeilensteng ersetzt de ganzen Inhalt, ouni ze fusionéieren).
   // Elo: bei "ok:false" gëtt en Feeler geworf, deen an 'error' lant, an de
-  // Späicheren-Knäppchen bleift gespaart, bis en erfollegräicht Lueden gëtt.
+  // Späicheren-Knäppchen bleift gespaart, bis en erfollegräichen Lueden gëtt.
   const lade = (id) => {
     const s = SCHUELER.find((x) => x.id === id);
     if (!s) return;
@@ -269,7 +284,7 @@ function App() {
           {gespaart && currentSchueler ? (
             <div className="gespaart-row">
               <span className="gespaart-label">👤 {currentSchueler.name} ({currentSchueler.klasse})</span>
-              <button className="link-btn-klein" onClick={() => setGespaart(false)}>Net dee/déi hei? Wiesselen</button>
+              {!istSchueler && <button className="link-btn-klein" onClick={() => setGespaart(false)}>Net dee/déi hei? Wiesselen</button>}
             </div>
           ) : (
             <label className="field">
