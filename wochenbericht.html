@@ -50,6 +50,13 @@ function heutigeWocheLabel() {
   sonntag.setDate(montag.getDate() + 6);
   return `${formatDatum(montag)} – ${formatDatum(sonntag)}`;
 }
+/** Wochelabel ("dd.mm.yyyy – dd.mm.yyyy") aus engem beliebege Datum an där Woch. */
+function wocheLabelFuerDatum(datum) {
+  const montag = montagDerWoche(new Date(datum));
+  const sonntag = new Date(montag);
+  sonntag.setDate(montag.getDate() + 6);
+  return `${formatDatum(montag)} – ${formatDatum(sonntag)}`;
+}
 /** True, wa mer nach virun der offizieller Startwoch (21.09.2026) sinn. */
 function nachVirWochenberichtStart() {
   const montag = montagDerWoche(new Date());
@@ -112,6 +119,7 @@ function App() {
 
   const [periode, setPeriode] = useState("");
   const [bericht, setBericht] = useState(leererBericht());
+  const [aneWocheGewielt, setAneWocheGewielt] = useState(false);
   const [dateien, setDateien] = useState([]);
   const [meng, setMeng] = useState([]);
   const [meilensteng, setMeilensteng] = useState([]); // fir d'Optional-Verlinkung
@@ -223,6 +231,7 @@ function App() {
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
       setToast("Wochebericht ofginn.");
       setBericht(leererBericht());
+      setAneWocheGewielt(false);
       setMeilensteenManuellGewielt(false);
       setDateien([]);
       lade();
@@ -245,6 +254,7 @@ function App() {
       meilensteen: w.Meilensteen || "",
     });
     setMeilensteenManuellGewielt(!!w.Meilensteen);
+    setAneWocheGewielt(false);
     setDateien([]);
     setPeriode(w.Periode);
   };
@@ -321,6 +331,41 @@ function App() {
               <div className="punkte-hint">Zusammefaassung 2P · Fortschrëtt 1,5P · Ahänk 1P · Grammatik 0,5P — max. 5P/Bericht</div>
               {bestehendFuerWoche && (
                 <p className="notice">ℹ️ Du hues fir dës Woch scho e (nach net bewäerte) Bericht ofginn — mat Späicheren änderss du en.</p>
+              )}
+
+              {!bericht.id && (
+                !aneWocheGewielt ? (
+                  <button
+                    type="button"
+                    className="link-btn-klein"
+                    onClick={() => setAneWocheGewielt(true)}
+                  >
+                    📅 Huet däi Betreier eng verpasst Woch fir dech rem opgemaach? Hei eng vergaangen Woch auswielen
+                  </button>
+                ) : (
+                  <label className="field aner-woche-feld">
+                    <span className="field-label">Woch nogeschécken <em>(fir eng Woch, déi de Betreier rem opgemaach huet)</em></span>
+                    <input
+                      type="date"
+                      className="select"
+                      max={new Date().toISOString().slice(0, 10)}
+                      onChange={(e) => {
+                        if (!e.target.value) return;
+                        setBericht({ ...bericht, woche: wocheLabelFuerDatum(e.target.value) });
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="link-btn-klein"
+                      onClick={() => {
+                        setBericht((b) => ({ ...b, woche: heutigeWocheLabel() }));
+                        setAneWocheGewielt(false);
+                      }}
+                    >
+                      Zréck op déi aktuell Woch
+                    </button>
+                  </label>
+                )
               )}
 
               {meilensteng.length > 0 && (
@@ -435,6 +480,9 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .punkte-hint { font-size: 11.5px; color: #6d7d74; background: #eef3ef; padding: 8px 12px; border-radius: 7px; margin-bottom: 14px; }
 .notice { background: #fbe8c6; color: #8a5a12; font-size: 12.5px; padding: 10px 14px; border-radius: 8px; margin: 0; }
 .notice-preview { background: #eaf0f8; color: #294f3c; }
+.link-btn-klein { font-size: 11.5px; color: #4576B5; background: none; border: none; text-decoration: underline; cursor: pointer; padding: 0; margin: 0 0 14px; display: block; }
+.aner-woche-feld { background: #eef3ef; padding: 10px 12px; border-radius: 8px; }
+.aner-woche-feld .link-btn-klein { margin: 6px 0 0; }
 .datei-liste { list-style: none; padding: 0; margin: 6px 0 0; font-size: 12px; color: #55625a; }
 .datei-liste li { padding: 3px 0; }
 .btn { font-size: 13.5px; font-weight: 700; padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; }
