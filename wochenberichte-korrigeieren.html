@@ -100,6 +100,34 @@ function App() {
     }
   };
 
+  // De Prof kann esou de Sonndes-um-23h-automatesch-"Verpasst"-Eintrag
+  // (0 Punkte) rem ewechhuelen, well de Duplikat-Check am Backend soss
+  // jiddereng weider richteg Ofgab fir déiselwecht Woch blockéiert. No
+  // der Läschung kann de Schüler am Wochenbericht-Formulaire iwwer de
+  // Datum-Auswieler ("Fir eng aner Woch nogeschécken") nach eng Kéier e
+  // richtege Bericht fir dës Woch areechen.
+  const remOpmaachen = async () => {
+    if (!confirm(`De verpassten Eintrag vun ${ufweis(offen.Schüler)} fir d'Woch ${offen.Woche} läschen, sou datt en/si nach eng Kéier e richtege Bericht ka areechen?`)) return;
+    setSyncing(true);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ typ: "wochenberichtRemOpmaachen", token: window.PPREN_SESSION?.token || "", id: offen.ID }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      setToast("Rem opgemaach — kann elo nach eng Kéier areecht ginn.");
+      setOffen(null);
+      lade();
+    } catch (e) {
+      alert("Konnte net rem opmaachen: " + e.message);
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setToast(null), 3500);
+    }
+  };
+
   const speicherePunkte = async () => {
     setSyncing(true);
     try {
@@ -180,6 +208,16 @@ function App() {
         <div className="modal-overlay" onClick={() => setOffen(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>{ufweis(offen.Schüler)} — {offen.Woche}</h2>
+
+            {offen.Status === "Verpasst" && (
+              <p className="verpasst-hint">
+                ⚠️ Dëse Bericht gouf automatesch als <strong>"Verpasst"</strong> markéiert (0 Punkte), well de Schüler bis
+                Sonndes 23.00h näischt ofginn huet. Soulaang dëse Eintrag esou do steet, kann de Schüler fir dës Woch
+                <strong> kee richtege Bericht méi areechen</strong> (de System denkt, et gouf schonn ee ofginn).
+                Mat "Rem opmaachen" hei drënner läschs du dëse Placeholder, sou datt en/si nach eng Kéier areeche kann.
+              </p>
+            )}
+
             <div className="modal-feld">
               <span className="modal-label">Zesummefaassung</span>
               <p>{offen.Zusammenfassung}</p>
@@ -203,31 +241,36 @@ function App() {
               </div>
             )}
 
-            <div className="punkte-grid">
-              <label className="punkte-feld">
-                <span>Zesummefaassung (max 2)</span>
-                <input type="number" step="0.5" min="0" max="2" value={punkte.zusammenfassung} onChange={(e) => setPunkte({ ...punkte, zusammenfassung: e.target.value })} disabled={offen.Status === "Bewäert"} />
-              </label>
-              <label className="punkte-feld">
-                <span>Fortschrëtt (max 1,5)</span>
-                <input type="number" step="0.5" min="0" max="1.5" value={punkte.fortschritt} onChange={(e) => setPunkte({ ...punkte, fortschritt: e.target.value })} disabled={offen.Status === "Bewäert"} />
-              </label>
-              <label className="punkte-feld">
-                <span>Ahänk (max 1)</span>
-                <input type="number" step="0.5" min="0" max="1" value={punkte.anhaenge} onChange={(e) => setPunkte({ ...punkte, anhaenge: e.target.value })} disabled={offen.Status === "Bewäert"} />
-              </label>
-              <label className="punkte-feld">
-                <span>Grammatik (max 0,5)</span>
-                <input type="number" step="0.5" min="0" max="0.5" value={punkte.grammatik} onChange={(e) => setPunkte({ ...punkte, grammatik: e.target.value })} disabled={offen.Status === "Bewäert"} />
-              </label>
-            </div>
+            {offen.Status !== "Verpasst" && (
+              <div className="punkte-grid">
+                <label className="punkte-feld">
+                  <span>Zesummefaassung (max 2)</span>
+                  <input type="number" step="0.5" min="0" max="2" value={punkte.zusammenfassung} onChange={(e) => setPunkte({ ...punkte, zusammenfassung: e.target.value })} disabled={offen.Status === "Bewäert"} />
+                </label>
+                <label className="punkte-feld">
+                  <span>Fortschrëtt (max 1,5)</span>
+                  <input type="number" step="0.5" min="0" max="1.5" value={punkte.fortschritt} onChange={(e) => setPunkte({ ...punkte, fortschritt: e.target.value })} disabled={offen.Status === "Bewäert"} />
+                </label>
+                <label className="punkte-feld">
+                  <span>Ahänk (max 1)</span>
+                  <input type="number" step="0.5" min="0" max="1" value={punkte.anhaenge} onChange={(e) => setPunkte({ ...punkte, anhaenge: e.target.value })} disabled={offen.Status === "Bewäert"} />
+                </label>
+                <label className="punkte-feld">
+                  <span>Grammatik (max 0,5)</span>
+                  <input type="number" step="0.5" min="0" max="0.5" value={punkte.grammatik} onChange={(e) => setPunkte({ ...punkte, grammatik: e.target.value })} disabled={offen.Status === "Bewäert"} />
+                </label>
+              </div>
+            )}
 
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setOffen(null)}>Zoumaachen</button>
+              {offen.Status === "Verpasst" && (
+                <button className="btn btn-open" disabled={syncing} onClick={remOpmaachen}>🔓 Rem opmaachen fir Nogeschécken</button>
+              )}
               {(offen.Status === "Agereecht" || offen.Status === "Verpasst") && (
                 <button className="btn btn-warn" disabled={syncing} onClick={entschellegen}>🩹 Als entschëllegt markéieren</button>
               )}
-              {offen.Status !== "Bewäert" && offen.Status !== "Entschëllegt" && (
+              {offen.Status !== "Bewäert" && offen.Status !== "Entschëllegt" && offen.Status !== "Verpasst" && (
                 <button className="btn btn-primary" disabled={syncing} onClick={speicherePunkte}>{syncing ? "Späichert…" : "✅ Bewäertung späicheren"}</button>
               )}
             </div>
@@ -264,6 +307,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .pill-verpasst { background: #fbe4e1; color: #99392f; }
 .pill-entschellegt { background: #e7eef7; color: #4576B5; }
 .btn-warn { background: #fbe8c6; color: #8a5a12; }
+.btn-open { background: #d7ecdd; color: #00733a; }
+.verpasst-hint { background: #fbe4e1; color: #7a2a20; font-size: 12.5px; padding: 12px 14px; border-radius: 8px; line-height: 1.55; margin: 0 0 14px; }
 .entschellegung-grond { font-size: 12.5px; color: #4576B5; background: #e7eef7; padding: 8px 12px; border-radius: 8px; margin: 10px 0 0; }
 .pill-done { background: #d7ecdd; color: #00A94F; }
 .btn-gen { font-size: 11.5px; font-weight: 700; color: #00A94F; background: #eef3ef; border: 1px solid #c9d5cd; padding: 6px 12px; border-radius: 7px; cursor: pointer; }
@@ -281,7 +326,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .punkte-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
 .punkte-feld { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #294f3c; }
 .punkte-feld input { border: 1px solid #c9d5cd; border-radius: 7px; padding: 8px 10px; font-size: 13.5px; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 .btn { font-size: 13.5px; font-weight: 700; padding: 9px 16px; border-radius: 8px; border: none; cursor: pointer; }
 .btn-primary { background: #00A94F; color: #fff; }
 .btn-ghost { background: #eef3ef; color: #294f3c; }
