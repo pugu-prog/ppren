@@ -61,6 +61,7 @@ function App() {
   const [editSyncing, setEditSyncing] = useState(false);
   const [editError, setEditError] = useState(null);
   const [backendAlt, setBackendAlt] = useState(false);
+  const [laeschSyncing, setLaeschSyncing] = useState(null);
 
   const token = () => window.PPREN_SESSION?.token || "";
 
@@ -157,9 +158,19 @@ function App() {
     } catch (e) { alert(e.message); }
   };
 
+  // Läscht ni nëmmen de Login-Zougang -- fir e Schüler ginn och all seng
+  // Donnéeën (Noten, Wochenberichter, Meilensteng, Rendez-vousen, Budget,
+  // asw.) an säi Projet-Ordner op Drive mat ewechgeholl (de Backend mécht
+  // dat automatesch mat, kuck läschAllSchuelerDaten() am Code.gs). Dofir
+  // hei explizit a kloer warnen, ier et wierklech geschitt.
   const permanentLaeschen = async (p) => {
-    if (!confirm(`"${p.numm}" PERMANENT läschen? Dëst kann net réckgängeg gemaach ginn — all Login-Zougang geet verluer.`)) return;
-    if (!confirm(`Sécher? Ee leschte Kéier: "${p.numm}" wierklech endgülteg läschen?`)) return;
+    const istSchueler = p.rolle === "Schüler";
+    const warnText = istSchueler
+      ? `"${p.numm}" PERMANENT läschen?\n\nDëst läscht NET nëmmen de Login-Zougang, mä AUCH:\n• All seng Noten/Bewertungen\n• All seng Wochenberichter, Meilensteng, Fachgespréicher, Ziel-Iwwerpréiwungen\n• Säi Budget/Ausgaben a Rendez-vousen\n• Säi ganze Projet-Ordner op Drive (Projektplang, Suivi, Dokumenter) -- gëtt an den Drive-Container "Trash" geluecht\n\nDëst kann net réckgängeg gemaach ginn.`
+      : `"${p.numm}" PERMANENT läschen? Dëst kann net réckgängeg gemaach ginn — all Login-Zougang geet verluer.`;
+    if (!confirm(warnText)) return;
+    if (!confirm(`Sécher? Ee leschte Kéier: "${p.numm}"${istSchueler ? " mat ALL senge Donnéeën" : ""} wierklech endgülteg läschen?`)) return;
+    setLaeschSyncing(p.numm);
     try {
       const res = await fetch(WEB_APP_URL, {
         method: "POST",
@@ -168,8 +179,13 @@ function App() {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error);
+      if (data.warnung) alert("⚠️ " + data.warnung);
       lade();
-    } catch (e) { alert(e.message); }
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setLaeschSyncing(null);
+    }
   };
 
   const passwuertAendernOeffnen = (p) => {
@@ -459,7 +475,7 @@ function App() {
                             <button className="icon-btn icon-btn-gréng" onClick={() => editOeffnen(p)}>✏️ Änneren</button>
                             <button className="icon-btn icon-btn-blo" onClick={() => passwuertAendernOeffnen(p)}>🔑 Passwuert</button>
                             <button className="icon-btn" onClick={() => toggleAktiv(p)}>{p.aktiv ? "Deaktivéieren" : "Aktivéieren"}</button>
-                            <button className="icon-btn icon-btn-rout" onClick={() => permanentLaeschen(p)}>🗑️ Läschen</button>
+                            <button className="icon-btn icon-btn-rout" disabled={laeschSyncing === p.numm} onClick={() => permanentLaeschen(p)}>{laeschSyncing === p.numm ? "…" : "🗑️ Läschen"}</button>
                           </td>
                         </tr>
                       )}
