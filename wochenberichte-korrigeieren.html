@@ -28,8 +28,33 @@ const { useState, useEffect, useMemo } = React;
 
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
 
+const PERIODEN_2GSE = ["Trimester 1", "Trimester 2", "Trimester 3"];
+const PERIODEN_1GSE = ["Semester 1", "Semester 2"];
+
+function montagDerWoche(datum) {
+  const d = new Date(datum);
+  const tag = d.getDay();
+  const diff = d.getDate() - tag + (tag === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+}
+function formatDatum(d) {
+  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+function wocheLabelFuerDatum(datum) {
+  const montag = montagDerWoche(new Date(datum));
+  const sonntag = new Date(montag);
+  sonntag.setDate(montag.getDate() + 6);
+  return `${formatDatum(montag)} – ${formatDatum(sonntag)}`;
+}
+
 function App() {
   const [alle, setAlle] = useState([]);
+  const [externOffen, setExternOffen] = useState(false);
+  const [externSchueler, setExternSchueler] = useState("");
+  const [externPeriode, setExternPeriode] = useState("");
+  const [externDatum, setExternDatum] = useState("");
+  const [externPunkte, setExternPunkte] = useState("");
+  const [externNotiz, setExternNotiz] = useState("");
   const [personen, setPersonen] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -128,6 +153,51 @@ function App() {
     }
   };
 
+  const schuelerListeVollstaendeg = useMemo(
+    () => personen.filter((p) => p.rolle === "Schüler"),
+    [personen]
+  );
+  const externSchuelerObj = schuelerListeVollstaendeg.find((s) => s.numm === externSchueler);
+  const externPerioden = externSchuelerObj?.klasse === "2GSE" ? PERIODEN_2GSE : PERIODEN_1GSE;
+  const externWoche = externDatum ? wocheLabelFuerDatum(externDatum) : "";
+  const externGueltegePunkte = externPunkte !== "" && !isNaN(Number(externPunkte)) && Number(externPunkte) >= 0 && Number(externPunkte) <= 5;
+  const externKannSpeicheren = externSchueler && externPeriode && externWoche && externGueltegePunkte;
+
+  // Wochebericht, deen ausserhalb vun der App bewäert gouf (z.B. op Pabeier):
+  // mat senge Punkten (0-5) als "Bewäert" aginn, sou datt en an der Bewertung
+  // matgezielt gëtt.
+  const externSpeicheren = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          typ: "wochenberichtExternEintragen",
+          token: window.PPREN_SESSION?.token || "",
+          schueler: externSchueler,
+          klasse: externSchuelerObj?.klasse || "",
+          periode: externPeriode,
+          woche: externWoche,
+          punkte: Number(externPunkte),
+          notiz: externNotiz,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      setToast(`Extern bewäert Bericht (${externWoche}) agedroen.`);
+      setExternDatum("");
+      setExternPunkte("");
+      setExternNotiz("");
+      lade();
+    } catch (e) {
+      alert("Konnte net späicheren: " + e.message);
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setToast(null), 3500);
+    }
+  };
+
   const speicherePunkte = async () => {
     setSyncing(true);
     try {
@@ -177,6 +247,7 @@ function App() {
             <option value="Bewäert">Scho bewäert</option>
             <option value="alle">All</option>
           </select>
+          <button className="btn-gen btn-extern" onClick={() => setExternOffen(true)}>➕ Extern bewäert Bericht aginn</button>
         </div>
 
         {loading && <div className="empty">Lädt…</div>}
@@ -280,6 +351,48 @@ function App() {
           </div>
         </div>
       )}
+      {externOffen && (
+        <div className="modal-overlay" onClick={() => setExternOffen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>➕ Extern bewäert Wochenbericht aginn</h2>
+            <p className="extern-hint">
+              Fir Berichter, déi ausserhalb vun der App bewäert goufen. Si ginn als „Bewäert“ gespäichert a gi
+              mat hire Punkten (max. 5) an der Bewertung matgezielt. Ass fir déi Woch nëmmen en automatesche „Verpasst“-Eintrag
+              do, gëtt deen ersat.
+            </p>
+            <label className="punkte-feld extern-feld">
+              <span>Schüler/-in</span>
+              <select className="select" value={externSchueler} onChange={(e) => { setExternSchueler(e.target.value); setExternPeriode(""); }}>
+                <option value="">– auswielen –</option>
+                {schuelerListeVollstaendeg.map((s) => <option key={s.numm} value={s.numm}>{s.virnumm ? `${s.virnumm} — ` : ""}{s.numm} ({s.klasse})</option>)}
+              </select>
+            </label>
+            <label className="punkte-feld extern-feld">
+              <span>Periode</span>
+              <select className="select" value={externPeriode} onChange={(e) => setExternPeriode(e.target.value)} disabled={!externSchueler}>
+                <option value="">– auswielen –</option>
+                {externPerioden.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+            <label className="punkte-feld extern-feld">
+              <span>Eng Datum aus där Woch {externWoche && <em className="extern-woche">→ {externWoche}</em>}</span>
+              <input type="date" className="select" value={externDatum} onChange={(e) => setExternDatum(e.target.value)} />
+            </label>
+            <label className="punkte-feld extern-feld">
+              <span>Punkte (0 – 5, Schrëtt 0,5)</span>
+              <input type="number" step="0.5" min="0" max="5" value={externPunkte} onChange={(e) => setExternPunkte(e.target.value)} />
+            </label>
+            <label className="punkte-feld extern-feld">
+              <span>Notiz (optional, z.B. wou bewäert)</span>
+              <input type="text" className="select" value={externNotiz} onChange={(e) => setExternNotiz(e.target.value)} placeholder="z.B. op Pabeier bewäert" />
+            </label>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setExternOffen(false)}>Zoumaachen</button>
+              <button className="btn btn-primary" disabled={!externKannSpeicheren || syncing} onClick={externSpeicheren}>{syncing ? "Späichert…" : "💾 Aginn"}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
@@ -308,6 +421,11 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .pill-entschellegt { background: #e7eef7; color: #4576B5; }
 .btn-warn { background: #fbe8c6; color: #8a5a12; }
 .btn-open { background: #d7ecdd; color: #00733a; }
+.btn-extern { margin-left: auto; }
+.extern-hint { font-size: 12.5px; color: #55625a; background: #eef3ef; padding: 10px 12px; border-radius: 8px; line-height: 1.5; margin: 0 0 14px; }
+.extern-feld { margin-bottom: 12px; }
+.extern-feld .select, .extern-feld input { width: 100%; }
+.extern-woche { font-style: normal; font-weight: 600; color: #00A94F; }
 .verpasst-hint { background: #fbe4e1; color: #7a2a20; font-size: 12.5px; padding: 12px 14px; border-radius: 8px; line-height: 1.55; margin: 0 0 14px; }
 .entschellegung-grond { font-size: 12.5px; color: #4576B5; background: #e7eef7; padding: 8px 12px; border-radius: 8px; margin: 10px 0 0; }
 .pill-done { background: #d7ecdd; color: #00A94F; }
