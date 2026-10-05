@@ -47,13 +47,26 @@ function wocheLabelFuerDatum(datum) {
   return `${formatDatum(montag)} – ${formatDatum(sonntag)}`;
 }
 
+function dateiZuBase64(datei) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(datei);
+  });
+}
+
+const MAX_DATEI_MB = 10;
+
 function App() {
   const [alle, setAlle] = useState([]);
   const [externOffen, setExternOffen] = useState(false);
   const [externSchueler, setExternSchueler] = useState("");
   const [externPeriode, setExternPeriode] = useState("");
   const [externDatum, setExternDatum] = useState("");
-  const [externPunkte, setExternPunkte] = useState("");
+  const [externPunkte, setExternPunkte] = useState({ zusammenfassung: "", fortschritt: "", anhaenge: "", grammatik: "" });
+  const [externDateien, setExternDateien] = useState([]);
+  const [externDragOver, setExternDragOver] = useState(false);
   const [externNotiz, setExternNotiz] = useState("");
   const [personen, setPersonen] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -125,12 +138,10 @@ function App() {
     }
   };
 
-  // De Prof kann esou de Sonndes-um-23h-automatesch-"Verpasst"-Eintrag
-  // (0 Punkte) rem ewechhuelen, well de Duplikat-Check am Backend soss
-  // jiddereng weider richteg Ofgab fir déiselwecht Woch blockéiert. No
-  // der Läschung kann de Schüler am Wochenbericht-Formulaire iwwer de
-  // Datum-Auswieler ("Fir eng aner Woch nogeschécken") nach eng Kéier e
-  // richtege Bericht fir dës Woch areechen.
+  // Läscht en automateschen "Verpasst"-Eintrag (0 Punkte). Néideg ass dat
+  // normalerweis net méi: eng richteg Ofgab vum Schüler ersetzt den
+  // Placeholder automatesch. Mat dësem Knäppchen kann de Prof en awer
+  // ganz ewechhuelen (z.B. wann een Schüler guer näischt ofginn muss).
   const remOpmaachen = async () => {
     if (!confirm(`De verpassten Eintrag vun ${ufweis(offen.Schüler)} fir d'Woch ${offen.Woche} läschen, sou datt en/si nach eng Kéier e richtege Bericht ka areechen?`)) return;
     setSyncing(true);
@@ -160,15 +171,38 @@ function App() {
   const externSchuelerObj = schuelerListeVollstaendeg.find((s) => s.numm === externSchueler);
   const externPerioden = externSchuelerObj?.klasse === "2GSE" ? PERIODEN_2GSE : PERIODEN_1GSE;
   const externWoche = externDatum ? wocheLabelFuerDatum(externDatum) : "";
-  const externGueltegePunkte = externPunkte !== "" && !isNaN(Number(externPunkte)) && Number(externPunkte) >= 0 && Number(externPunkte) <= 5;
-  const externKannSpeicheren = externSchueler && externPeriode && externWoche && externGueltegePunkte;
+  const EXTERN_GRENZEN = { zusammenfassung: 2, fortschritt: 1.5, anhaenge: 1, grammatik: 0.5 };
+  const externFeldGueltig = (k) => {
+    const v = externPunkte[k];
+    return v !== "" && !isNaN(Number(v)) && Number(v) >= 0 && Number(v) <= EXTERN_GRENZEN[k];
+  };
+  const externAllePunkteGueltig = Object.keys(EXTERN_GRENZEN).every(externFeldGueltig);
+  const externSumme = Object.keys(EXTERN_GRENZEN).reduce((s, k) => s + (externFeldGueltig(k) ? Number(externPunkte[k]) : 0), 0);
+  const externKannSpeicheren = externSchueler && externPeriode && externWoche && externAllePunkteGueltig;
+
+  const externDateienBeifuegen = (fileList) => {
+    const neie = Array.from(fileList || []);
+    const zuGross = neie.filter((f) => f.size > MAX_DATEI_MB * 1024 * 1024);
+    if (zuGross.length > 0) {
+      alert(`Zu grouss (max. ${MAX_DATEI_MB} MB pro Datei): ` + zuGross.map((f) => f.name).join(", "));
+    }
+    const ok = neie.filter((f) => f.size <= MAX_DATEI_MB * 1024 * 1024);
+    setExternDateien((alt) => [...alt, ...ok]);
+  };
 
   // Wochebericht, deen ausserhalb vun der App bewäert gouf (z.B. op Pabeier):
-  // mat senge Punkten (0-5) als "Bewäert" aginn, sou datt en an der Bewertung
-  // matgezielt gëtt.
+  // mat de véier Punkte-Kategorien (selwecht Skala wéi bei der Korrektur) als
+  // "Bewäert" aginn, optional mam Bericht selwer als Datei (Word, PDF, Foto).
   const externSpeicheren = async () => {
     setSyncing(true);
     try {
+      const anhaengeDateien = await Promise.all(
+        externDateien.map(async (d) => ({
+          dateiName: d.name,
+          mimeType: d.type || "application/octet-stream",
+          inhaltBase64: await dateiZuBase64(d),
+        }))
+      );
       const res = await fetch(WEB_APP_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -179,16 +213,23 @@ function App() {
           klasse: externSchuelerObj?.klasse || "",
           periode: externPeriode,
           woche: externWoche,
-          punkte: Number(externPunkte),
+          punkteDetail: {
+            zusammenfassung: Number(externPunkte.zusammenfassung),
+            fortschritt: Number(externPunkte.fortschritt),
+            anhaenge: Number(externPunkte.anhaenge),
+            grammatik: Number(externPunkte.grammatik),
+          },
           notiz: externNotiz,
+          anhaengeDateien,
         }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
       setToast(`Extern bewäert Bericht (${externWoche}) agedroen.`);
       setExternDatum("");
-      setExternPunkte("");
+      setExternPunkte({ zusammenfassung: "", fortschritt: "", anhaenge: "", grammatik: "" });
       setExternNotiz("");
+      setExternDateien([]);
       lade();
     } catch (e) {
       alert("Konnte net späicheren: " + e.message);
@@ -283,9 +324,8 @@ function App() {
             {offen.Status === "Verpasst" && (
               <p className="verpasst-hint">
                 ⚠️ Dëse Bericht gouf automatesch als <strong>"Verpasst"</strong> markéiert (0 Punkte), well de Schüler bis
-                Sonndes 23.00h näischt ofginn huet. Soulaang dëse Eintrag esou do steet, kann de Schüler fir dës Woch
-                <strong> kee richtege Bericht méi areechen</strong> (de System denkt, et gouf schonn ee ofginn).
-                Mat "Rem opmaachen" hei drënner läschs du dëse Placeholder, sou datt en/si nach eng Kéier areeche kann.
+                zur Frist näischt ofginn huet. Gëtt de Schüler elo nach e richtege Bericht of, ersetzt dee
+                <strong> automatesch</strong> dëse Placeholder. Mat "Rem opmaachen" kanns de en och ganz läschen.
               </p>
             )}
 
@@ -357,7 +397,7 @@ function App() {
             <h2>➕ Extern bewäert Wochenbericht aginn</h2>
             <p className="extern-hint">
               Fir Berichter, déi ausserhalb vun der App bewäert goufen. Si ginn als „Bewäert“ gespäichert a gi
-              mat hire Punkten (max. 5) an der Bewertung matgezielt. Ass fir déi Woch nëmmen en automatesche „Verpasst“-Eintrag
+              mat de selwechte Punkte-Kategorien wéi bei der Korrektur (max. 5) an der Bewertung matgezielt. Ass fir déi Woch nëmmen en automatesche „Verpasst“-Eintrag
               do, gëtt deen ersat.
             </p>
             <label className="punkte-feld extern-feld">
@@ -378,10 +418,55 @@ function App() {
               <span>Eng Datum aus där Woch {externWoche && <em className="extern-woche">→ {externWoche}</em>}</span>
               <input type="date" className="select" value={externDatum} onChange={(e) => setExternDatum(e.target.value)} />
             </label>
-            <label className="punkte-feld extern-feld">
-              <span>Punkte (0 – 5, Schrëtt 0,5)</span>
-              <input type="number" step="0.5" min="0" max="5" value={externPunkte} onChange={(e) => setExternPunkte(e.target.value)} />
-            </label>
+            <div className="punkte-grid extern-punkte-grid">
+              <label className="punkte-feld">
+                <span>Zesummefaassung (max 2)</span>
+                <input type="number" step="0.5" min="0" max="2" value={externPunkte.zusammenfassung} onChange={(e) => setExternPunkte({ ...externPunkte, zusammenfassung: e.target.value })} />
+              </label>
+              <label className="punkte-feld">
+                <span>Fortschrëtt (max 1,5)</span>
+                <input type="number" step="0.5" min="0" max="1.5" value={externPunkte.fortschritt} onChange={(e) => setExternPunkte({ ...externPunkte, fortschritt: e.target.value })} />
+              </label>
+              <label className="punkte-feld">
+                <span>Ahänk (max 1)</span>
+                <input type="number" step="0.5" min="0" max="1" value={externPunkte.anhaenge} onChange={(e) => setExternPunkte({ ...externPunkte, anhaenge: e.target.value })} />
+              </label>
+              <label className="punkte-feld">
+                <span>Grammatik (max 0,5)</span>
+                <input type="number" step="0.5" min="0" max="0.5" value={externPunkte.grammatik} onChange={(e) => setExternPunkte({ ...externPunkte, grammatik: e.target.value })} />
+              </label>
+            </div>
+            <p className="extern-summe">Total: <strong>{externSumme}</strong> / 5</p>
+            <div className="punkte-feld extern-feld">
+              <span>Bericht (optional) — Word, PDF, Foto, ...</span>
+              <div
+                className={`dropzone${externDragOver ? " dropzone-aktiv" : ""}`}
+                onDragOver={(e) => { e.preventDefault(); setExternDragOver(true); }}
+                onDragLeave={() => setExternDragOver(false)}
+                onDrop={(e) => { e.preventDefault(); setExternDragOver(false); externDateienBeifuegen(e.dataTransfer.files); }}
+                onClick={() => document.getElementById("extern-datei-input").click()}
+              >
+                📎 Dateien hei dropen oder klicken zum Auswielen
+                <input
+                  id="extern-datei-input"
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx,.odt,.rtf,.txt,.xlsx,.pptx"
+                  style={{ display: "none" }}
+                  onChange={(e) => { externDateienBeifuegen(e.target.files); e.target.value = ""; }}
+                />
+              </div>
+              {externDateien.length > 0 && (
+                <ul className="extern-datei-liste">
+                  {externDateien.map((d, i) => (
+                    <li key={i}>
+                      <span>{d.name} ({Math.round(d.size / 1024)} KB)</span>
+                      <button type="button" className="datei-weg" onClick={() => setExternDateien((l) => l.filter((_, j) => j !== i))}>✕</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <label className="punkte-feld extern-feld">
               <span>Notiz (optional, z.B. wou bewäert)</span>
               <input type="text" className="select" value={externNotiz} onChange={(e) => setExternNotiz(e.target.value)} placeholder="z.B. op Pabeier bewäert" />
@@ -425,6 +510,13 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .extern-hint { font-size: 12.5px; color: #55625a; background: #eef3ef; padding: 10px 12px; border-radius: 8px; line-height: 1.5; margin: 0 0 14px; }
 .extern-feld { margin-bottom: 12px; }
 .extern-feld .select, .extern-feld input { width: 100%; }
+.extern-punkte-grid { margin: 4px 0 4px; }
+.extern-summe { font-size: 12.5px; color: #294f3c; margin: 0 0 12px; }
+.dropzone { border: 2px dashed #9db6a7; border-radius: 10px; padding: 18px 12px; text-align: center; font-size: 13px; font-weight: 600; color: #55625a; background: #fafbfa; cursor: pointer; }
+.dropzone-aktiv { border-color: #00A94F; background: #eaf7ef; color: #00733a; }
+.extern-datei-liste { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.extern-datei-liste li { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; font-weight: 600; background: #eef3ef; padding: 5px 10px; border-radius: 6px; }
+.datei-weg { border: none; background: transparent; color: #99392f; cursor: pointer; font-size: 13px; }
 .extern-woche { font-style: normal; font-weight: 600; color: #00A94F; }
 .verpasst-hint { background: #fbe4e1; color: #7a2a20; font-size: 12.5px; padding: 12px 14px; border-radius: 8px; line-height: 1.55; margin: 0 0 14px; }
 .entschellegung-grond { font-size: 12.5px; color: #4576B5; background: #e7eef7; padding: 8px 12px; border-radius: 8px; margin: 10px 0 0; }
