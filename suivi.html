@@ -114,6 +114,7 @@ function App() {
   const [error, setError] = useState(null);
   const [geladen, setGeladen] = useState(false);
   const [suiviPdfGenerating, setSuiviPdfGenerating] = useState(false);
+  const [wbOffenId, setWbOffenId] = useState(null);
 
   const currentSchueler = SCHUELER.find((s) => s.id === schuelerId);
   const istGSE2 = currentSchueler?.klasse === "2GSE";
@@ -445,7 +446,7 @@ function App() {
                   <p className="punkte-summe">Gesamt: {wbZesummefaassung.summe} / {wbZesummefaassung.max} Punkte{wbZesummefaassung.verpasst > 0 ? ` · ${wbZesummefaassung.verpasst} verpasst` : ""}</p>
                   <table className="wb-tabelle">
                     <thead>
-                      <tr><th>Woch</th><th>Status</th><th>Punkte</th></tr>
+                      <tr><th>Woch</th><th>Status</th><th>Punkte</th><th></th></tr>
                     </thead>
                     <tbody>
                       {[...wochenberichte].sort((a, b) => (ersteDatumVunWoche(a.Woche) || "").localeCompare(ersteDatumVunWoche(b.Woche) || "")).map((w, i) => {
@@ -458,12 +459,63 @@ function App() {
                         } else if (w.Status === "Verpasst") {
                           punkteAnzeigen = "0 / 5";
                         }
+                        const wbKey = w.ID || i;
+                        const wbOffen = wbOffenId === wbKey;
+                        let pDetail = null;
+                        if (w.Status === "Bewäert") {
+                          try { pDetail = JSON.parse(w["Punkte (JSON)"]); } catch { pDetail = null; }
+                        }
+                        const ahaenk = String(w["Anhänge"] || "").split("\n").map((z) => z.trim()).filter(Boolean);
                         return (
-                          <tr key={i}>
-                            <td>{w.Woche}</td>
-                            <td><span className={`journal-status journal-status-${{ "Bewäert": "erreecht", "Verpasst": "verspéit", "Agereecht": "neutral", "Entschëllegt": "ausstoend" }[w.Status] || "neutral"}`}>{w.Status}</span></td>
-                            <td>{punkteAnzeigen}</td>
-                          </tr>
+                          <React.Fragment key={wbKey}>
+                            <tr>
+                              <td>{w.Woche}</td>
+                              <td>
+                                <span className={`journal-status journal-status-${{ "Bewäert": "erreecht", "Verpasst": "verspéit", "Agereecht": "neutral", "Entschëllegt": "ausstoend" }[w.Status] || "neutral"}`}>{w.Status}</span>
+                                {w.Kommentar ? <span title="Kommentar vum Betreier"> 💬</span> : null}
+                              </td>
+                              <td>{punkteAnzeigen}</td>
+                              <td>
+                                <button type="button" className="wb-toggle" onClick={() => setWbOffenId(wbOffen ? null : wbKey)}>
+                                  {wbOffen ? "▴ Zou" : "▾ Liesen"}
+                                </button>
+                              </td>
+                            </tr>
+                            {wbOffen && (
+                              <tr>
+                                <td colSpan={4} className="wb-detail">
+                                  {w.Meilensteen && <div className="wb-detail-feld"><span className="wb-detail-label">Meilensteen</span><p>{w.Meilensteen}</p></div>}
+                                  <div className="wb-detail-feld"><span className="wb-detail-label">Zesummefaassung</span><p>{w.Zusammenfassung || "–"}</p></div>
+                                  {w.Fortschritt && <div className="wb-detail-feld"><span className="wb-detail-label">Fortschrëtt</span><p>{w.Fortschritt}</p></div>}
+                                  {ahaenk.length > 0 && (
+                                    <div className="wb-detail-feld">
+                                      <span className="wb-detail-label">Ahänk</span>
+                                      <div className="wb-ahaenk">
+                                        {ahaenk.map((z, j) => z.startsWith("http")
+                                          ? <a key={j} href={z} rel="noreferrer">📎 {z.split("/").pop() || "Datei " + (j + 1)}</a>
+                                          : <p key={j}>{z}</p>)}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {pDetail && (
+                                    <div className="wb-detail-feld">
+                                      <span className="wb-detail-label">Punkten</span>
+                                      <p>Zesummefaassung {pDetail.zusammenfassung || 0}/2 · Fortschrëtt {pDetail.fortschritt || 0}/1,5 · Ahänk {pDetail.anhaenge || 0}/1 · Grammatik {pDetail.grammatik || 0}/0,5</p>
+                                    </div>
+                                  )}
+                                  {w.Kommentar && (
+                                    <div className="wb-detail-feld wb-kommentar">
+                                      <span className="wb-detail-label">💬 Kommentar vum Betreier</span>
+                                      <p>{w.Kommentar}</p>
+                                    </div>
+                                  )}
+                                  {w.Status === "Entschëllegt" && w["Entschëllegung-Grond"] && (
+                                    <div className="wb-detail-feld"><span className="wb-detail-label">Entschëllegt</span><p>{w["Entschëllegung-Grond"]}</p></div>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         );
                       })}
                     </tbody>
@@ -529,7 +581,7 @@ function App() {
                     <h2>📖 Projet-Journal</h2>
                     <p className="journal-sub">All Meilensteng, Wochenberichter, Fachgespréicher a Ziel-Iwwerpréiwungen chronologesch — fir Dokumentatioun oder Iwwerbléck.</p>
                   </div>
-                  <button className="btn btn-ghost journal-print-btn" onClick={drécken}>🖨️ Als PDF exportéieren</button>
+                  <button className="btn btn-ghost journal-print-btn" onClick={drécken}>🖨️ Als PDF exportu00e9ieren</button>
                 </div>
 
                 {journal.zeitleischt.length > 0 && (
@@ -651,7 +703,7 @@ function App() {
 
                   {!b && <p className="notice">
                     {!istSchueler && entworfFuer(periode)
-                      ? "📝 Entworf existéiert (nach net validéiert) — de Schüler gesäit dëst nach net. Fäerdeg maachen a validéieren am Bewertungs-Tool."
+                      ? "📝 Entworf existu00e9iert (nach net validéiert) — de Schüler gesäit dëst nach net. Fäerdeg maachen a validéieren am Bewertungs-Tool."
                       : "Fir dës Period läit nach keng Bewertung vir."}
                   </p>}
 
@@ -840,6 +892,14 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .wb-tabelle { width: 100%; border-collapse: collapse; margin-top: 6px; }
 .wb-tabelle th { text-align: left; font-size: 10.5px; text-transform: uppercase; color: #93a098; padding: 5px 6px; border-bottom: 1px solid #eef1ef; }
 .wb-tabelle td { padding: 6px 6px; font-size: 12.5px; border-bottom: 1px solid #f4f6f4; }
+.wb-toggle { font-size: 11px; font-weight: 700; color: #00A94F; background: #eef3ef; border: 1px solid #c9d5cd; padding: 3px 9px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.wb-detail { background: #fafbfa; padding: 12px 14px; }
+.wb-detail-feld { margin-bottom: 10px; }
+.wb-detail-feld p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.55; color: #1c2621; white-space: pre-wrap; }
+.wb-detail-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; color: #294f3c; letter-spacing: 0.02em; }
+.wb-ahaenk { display: flex; flex-direction: column; gap: 3px; margin-top: 3px; }
+.wb-ahaenk a { font-size: 12.5px; font-weight: 600; color: #00A94F; text-decoration: none; }
+.wb-kommentar { background: #eaf0f8; border-radius: 8px; padding: 8px 10px; }
 
 /* ===== Rendez-vousen ===== */
 .rv-liste { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
