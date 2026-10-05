@@ -58,6 +58,51 @@ function dateiZuBase64(datei) {
 
 const MAX_DATEI_MB = 10;
 
+// Virgefäerdegt Sätz fir de Kommentar zum Wochenbericht (nom Muster vun de
+// Remarquen an der Bewertung). Een Klick hänkt de Saz un de Kommentar un; dee
+// bleift ëmmer fräi editéierbar, d'Sätz sinn nëmmen Hëllef.
+const KOMMENTAR_VORLAGEN = [
+  { thema: "Zusammenfassung", positiv: "Die Wochenzusammenfassung ist ausführlich und gut nachvollziehbar.", negativ: "Die Zusammenfassung ist zu kurz bzw. oberflächlich – bitte konkreter beschreiben, was genau gemacht wurde." },
+  { thema: "Fortschritt", positiv: "Der Fortschritt im Vergleich zum Plan wird klar und realistisch eingeschätzt.", negativ: "Die Einschätzung des Fortschritts bleibt vage – bitte einen klaren Bezug zum Plan herstellen." },
+  { thema: "Meilensteine", positiv: "Gute Verknüpfung mit den Meilensteinen und Zielen des Projektplans.", negativ: "Der Bezug zu den Meilensteinen und Zielen des Projektplans fehlt." },
+  { thema: "Probleme", positiv: "Aufgetretene Probleme werden benannt und Lösungsansätze reflektiert.", negativ: "Probleme und Schwierigkeiten werden nicht angesprochen oder nicht reflektiert." },
+  { thema: "Nächste Schritte", positiv: "Die nächsten Schritte sind klar und konkret formuliert.", negativ: "Bitte nächste Schritte für die kommende Woche konkret angeben." },
+  { thema: "Belege", positiv: "Fotos bzw. Belege dokumentieren die Arbeit sehr gut.", negativ: "Es fehlen Fotos, Belege oder Quellen zur Dokumentation der Arbeit." },
+  { thema: "Sprache", positiv: "Sprachlich korrekt und gut verständlich.", negativ: "Auf Rechtschreibung, Grammatik und Satzbau achten." },
+  { thema: "Umfang", positiv: "Umfang und Detailtiefe sind angemessen.", negativ: "Der geforderte Mindestumfang (5 Zeilen pro Feld) wurde nicht erreicht." },
+  { thema: "Eigenständigkeit", positiv: "Selbstständige und zielstrebige Arbeitsweise erkennbar.", negativ: "Mehr Eigeninitiative bei der Projektarbeit zeigen." },
+  { thema: "Pünktlichkeit", positiv: "Der Bericht wurde pünktlich abgegeben.", negativ: "Der Bericht wurde verspätet abgegeben – bitte die Frist (Sonntag 22:00) einhalten." },
+  { thema: "Gesamt", positiv: "Insgesamt ein überzeugender Wochenbericht.", negativ: "Insgesamt noch ausbaufähig – bitte die Hinweise beim nächsten Bericht beachten." },
+];
+
+function KommentarFeld({ wert, setWert }) {
+  const einfuegen = (text) => setWert((alt) => ((alt && !/\s$/.test(alt)) ? alt + " " : (alt || "")) + text);
+  return (
+    <div className="kommentar-box">
+      <span className="modal-label">💬 Kommentar fir de Schüler</span>
+      <details className="vorlagen">
+        <summary>Virgefäerdegt Sätz (klicken fir un de Kommentar unzehänken)</summary>
+        <div className="vorlagen-liste">
+          {KOMMENTAR_VORLAGEN.map((v) => (
+            <div className="vorlag-row" key={v.thema}>
+              <button type="button" className="vorlag-btn vorlag-pos" onClick={() => einfuegen(v.positiv)}>✓ {v.positiv}</button>
+              <button type="button" className="vorlag-btn vorlag-neg" onClick={() => einfuegen(v.negativ)}>✗ {v.negativ}</button>
+            </div>
+          ))}
+        </div>
+      </details>
+      <textarea
+        className="kommentar-textarea"
+        rows={4}
+        value={wert}
+        onChange={(e) => setWert(e.target.value)}
+        placeholder="Kommentar schreiwen oder Sätz uklicken … (bleift ëmmer editéierbar)"
+      />
+      {wert && <button type="button" className="link-btn-klein" onClick={() => setWert("")}>Kommentar läschen</button>}
+    </div>
+  );
+}
+
 function App() {
   const [alle, setAlle] = useState([]);
   const [externOffen, setExternOffen] = useState(false);
@@ -68,6 +113,8 @@ function App() {
   const [externDateien, setExternDateien] = useState([]);
   const [externDragOver, setExternDragOver] = useState(false);
   const [externNotiz, setExternNotiz] = useState("");
+  const [externKommentar, setExternKommentar] = useState("");
+  const [kommentar, setKommentar] = useState("");
   const [personen, setPersonen] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -112,6 +159,7 @@ function App() {
 
   const oeffnen = (w) => {
     setOffen(w);
+    setKommentar(w.Kommentar || "");
     setPunkte({ zusammenfassung: "2", fortschritt: "1.5", anhaenge: "1", grammatik: "0.5" });
   };
 
@@ -227,6 +275,7 @@ function App() {
             grammatik: Number(externPunkte.grammatik),
           },
           notiz: externNotiz,
+          kommentar: externKommentar,
           anhaengeDateien,
         }),
       });
@@ -236,6 +285,7 @@ function App() {
       setExternDatum("");
       setExternPunkte({ zusammenfassung: "", fortschritt: "", anhaenge: "", grammatik: "" });
       setExternNotiz("");
+      setExternKommentar("");
       setExternDateien([]);
       lade();
     } catch (e) {
@@ -243,6 +293,27 @@ function App() {
     } finally {
       setSyncing(false);
       setTimeout(() => setToast(null), 3500);
+    }
+  };
+
+  const kommentarSpeichern = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ typ: "wochenberichtKommentar", token: window.PPREN_SESSION?.token || "", id: offen.ID, kommentar }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      setToast("Kommentar gespäichert.");
+      setOffen((o) => (o ? { ...o, Kommentar: kommentar } : o));
+      lade();
+    } catch (e) {
+      alert("Konnte de Kommentar net späicheren: " + e.message);
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
@@ -258,7 +329,7 @@ function App() {
       const res = await fetch(WEB_APP_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ typ: "wochenberichtBewerten", token: window.PPREN_SESSION?.token || "", id: offen.ID, punkte: p }),
+        body: JSON.stringify({ typ: "wochenberichtBewerten", token: window.PPREN_SESSION?.token || "", id: offen.ID, punkte: p, kommentar }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
@@ -314,7 +385,7 @@ function App() {
                   <td>{w.Klasse}</td>
                   <td>{w.Periode}</td>
                   <td>{w.Woche}</td>
-                  <td><span className={`pill ${w.Status === "Bewäert" ? "pill-done" : w.Status === "Verpasst" ? "pill-verpasst" : w.Status === "Entschëllegt" ? "pill-entschellegt" : "pill-pending"}`}>{w.Status}</span></td>
+                  <td><span className={`pill ${w.Status === "Bewäert" ? "pill-done" : w.Status === "Verpasst" ? "pill-verpasst" : w.Status === "Entschëllegt" ? "pill-entschellegt" : "pill-pending"}`}>{w.Status}</span>{w.Kommentar ? <span title="Kommentar vorhanden"> 💬</span> : null}</td>
                   <td><button className="btn-gen" onClick={() => oeffnen(w)}>{w.Status === "Agereecht" ? "Korrigéieren" : "Kucken"}</button></td>
                 </tr>
               ))}
@@ -380,8 +451,11 @@ function App() {
               </div>
             )}
 
+            <KommentarFeld wert={kommentar} setWert={setKommentar} />
+
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setOffen(null)}>Zoumaachen</button>
+              <button className="btn btn-komm" disabled={syncing} onClick={kommentarSpeichern}>💬 Kommentar späicheren</button>
               {offen.Status === "Verpasst" && (
                 <button className="btn btn-open" disabled={syncing} onClick={remOpmaachen}>🔓 Rem opmaachen fir Nogeschécken</button>
               )}
@@ -474,6 +548,7 @@ function App() {
                 </ul>
               )}
             </div>
+            <KommentarFeld wert={externKommentar} setWert={setExternKommentar} />
             <label className="punkte-feld extern-feld">
               <span>Notiz (optional, z.B. wou bewäert)</span>
               <input type="text" className="select" value={externNotiz} onChange={(e) => setExternNotiz(e.target.value)} placeholder="z.B. op Pabeier bewäert" />
@@ -529,6 +604,16 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .datei-weg { border: none; background: transparent; color: #99392f; cursor: pointer; font-size: 13px; }
 .extern-fehlt { font-size: 12.5px; font-weight: 600; color: #8a5a12; background: #fbe8c6; padding: 8px 12px; border-radius: 8px; margin: 0 0 4px; }
 .btn-primary:disabled { background: #b7c6bd; cursor: not-allowed; }
+.kommentar-box { margin: 14px 0 4px; display: flex; flex-direction: column; gap: 6px; }
+.kommentar-textarea { width: 100%; border: 1px solid #c9d5cd; border-radius: 8px; padding: 9px 11px; font-size: 13.5px; font-family: inherit; resize: vertical; }
+.vorlagen summary { font-size: 12px; font-weight: 700; color: #4576B5; cursor: pointer; }
+.vorlagen-liste { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 260px; overflow-y: auto; padding-right: 4px; }
+.vorlag-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.vorlag-btn { text-align: left; font-size: 11.5px; line-height: 1.35; padding: 7px 9px; border-radius: 7px; border: 1px solid #dde4de; background: #fff; color: #55625a; cursor: pointer; }
+.vorlag-pos:hover { background: #d7ecdd; border-color: #00A94F; color: #00733a; }
+.vorlag-neg:hover { background: #fbe4e1; border-color: #99392f; color: #99392f; }
+.link-btn-klein { font-size: 11.5px; color: #99392f; background: none; border: none; text-decoration: underline; cursor: pointer; padding: 0; align-self: flex-start; }
+.btn-komm { background: #eaf0f8; color: #294f3c; }
 .extern-woche { font-style: normal; font-weight: 600; color: #00A94F; }
 .verpasst-hint { background: #fbe4e1; color: #7a2a20; font-size: 12.5px; padding: 12px 14px; border-radius: 8px; line-height: 1.55; margin: 0 0 14px; }
 .entschellegung-grond { font-size: 12.5px; color: #4576B5; background: #e7eef7; padding: 8px 12px; border-radius: 8px; margin: 10px 0 0; }
@@ -537,7 +622,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .empty { padding: 40px; text-align: center; color: #6d7d74; font-size: 14px; background: #fff; border-radius: 12px; border: 1px solid #e2e8e3; }
 .error { color: #8a2b1f; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(28,38,33,0.5); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
-.modal { background: #fff; border-radius: 14px; padding: 24px 26px; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; }
+.modal { background: #fff; border-radius: 14px; padding: 24px 26px; max-width: 680px; width: 100%; max-height: 85vh; overflow-y: auto; }
 .modal h2 { font-size: 16px; margin: 0 0 14px; color: #00A94F; }
 .modal-feld { margin-bottom: 12px; }
 .modal-label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #294f3c; }
