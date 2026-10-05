@@ -436,13 +436,22 @@ function App() {
                       } catch {}
                     }
                     return (
-                      <tr key={w.ID}>
-                        <td>{w.Woche}</td>
-                        <td className="cell-muted">{w.Meilensteen || "–"}</td>
-                        <td><span className={`pill ${w.Status === "Bewäert" ? "pill-done" : "pill-pending"}`}>{w.Status}</span></td>
-                        <td>{summe !== null ? `${summe} / 5` : "–"}</td>
-                        <td>{w.Status !== "Bewäert" && <button className="btn-gen" onClick={() => bearbechten(w)}>Änneren</button>}</td>
-                      </tr>
+                      <React.Fragment key={w.ID}>
+                        <tr>
+                          <td>{w.Woche}</td>
+                          <td className="cell-muted">{w.Meilensteen || "–"}</td>
+                          <td><span className={`pill ${w.Status === "Bewäert" ? "pill-done" : "pill-pending"}`}>{w.Status}</span></td>
+                          <td>{summe !== null ? `${summe} / 5` : "–"}</td>
+                          <td>{w.Status !== "Bewäert" && <button className="btn-gen" onClick={() => bearbechten(w)}>Änneren</button>}</td>
+                        </tr>
+                        {w.Kommentar && (
+                          <tr>
+                            <td colSpan={5} className="kommentar-zell">
+                              <strong>💬 Kommentar vum Betreier:</strong> {w.Kommentar}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -492,6 +501,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .tabelle { width: 100%; border-collapse: collapse; margin-top: 8px; }
 .tabelle th { text-align: left; font-size: 11px; text-transform: uppercase; color: #6d7d74; padding: 6px 8px; border-bottom: 1px solid #eef1ef; }
 .tabelle td { padding: 7px 8px; font-size: 13px; border-bottom: 1px solid #f4f6f4; }
+.kommentar-zell { background: #eaf0f8; color: #294f3c; font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; padding: 9px 12px; border-radius: 6px; }
 .cell-muted { color: #93a098; font-size: 12px; }
 .pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
 .pill-pending { background: #e6e9e6; color: #55625a; }
