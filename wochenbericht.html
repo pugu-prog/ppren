@@ -308,7 +308,7 @@ function App() {
 
   // ===== Alleguer Berichter: nëmmen liesen + PDF-/Word-Export =====
   const alleSortiert = useMemo(
-    () => [...meng].sort((a, b) => (ersteDatumVunWoche(a.Woche)?.getTime() || 0) - (ersteDatumVunWoche(b.Woche)?.getTime() || 0)),
+    () => meng.filter((w) => w.Status === "Bewäert").sort((a, b) => (ersteDatumVunWoche(a.Woche)?.getTime() || 0) - (ersteDatumVunWoche(b.Woche)?.getTime() || 0)),
     [meng]
   );
   const exportTitel = `Wochenberichter — ${currentSchueler?.virnumm ? currentSchueler.virnumm + " " : ""}(${currentSchueler?.name || ""}${currentSchueler?.klasse ? ", " + currentSchueler.klasse : ""})`;
@@ -373,7 +373,7 @@ function App() {
           </div>
         </section>
 
-        {schuelerId && !blockedByStart && meng.length > 0 && (
+        {schuelerId && !blockedByStart && alleSortiert.length > 0 && (
           <section className="card">
             <h2>📚 All meng Wochenberichter</h2>
             <p className="hint-klengt">Zum Nolesen an Exportéieren (all Perioden). Hei kann näischt geännert ginn.</p>
@@ -382,7 +382,7 @@ function App() {
               <button type="button" className="btn-export" onClick={wordExport}>📝 Als Word</button>
             </div>
             <details className="wbl-details">
-              <summary>{meng.length} Bericht{meng.length === 1 ? "" : "er"} weisen</summary>
+              <summary>{alleSortiert.length} bewäert Bericht{alleSortiert.length === 1 ? "" : "er"} weisen</summary>
               <WbLiesListe berichte={alleSortiert} />
             </details>
           </section>
@@ -552,7 +552,7 @@ function App() {
         )}
         {error && <div className="empty error">{error}</div>}
       </main>
-      {meng.length > 0 && (
+      {alleSortiert.length > 0 && (
         <div className="druck-wb">
           <div id="druck-inhalt">
             <h1>{exportTitel}</h1>
