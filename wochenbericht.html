@@ -91,6 +91,53 @@ const leererBericht = () => ({
   meilensteen: "",
 });
 
+/** Text mat Zeilenëmbréch (<br>), funktionéiert och beim Word-Export. */
+function TextMatUmbroch({ t }) {
+  return String(t || "").split("\n").map((z, i) => (
+    <React.Fragment key={i}>{i > 0 && <br />}{z}</React.Fragment>
+  ));
+}
+
+function wbPunkteVun(w) {
+  if (w.Status !== "Bewäert") return null;
+  try {
+    const p = JSON.parse(w["Punkte (JSON)"]);
+    const summe = (p.zusammenfassung || 0) + (p.fortschritt || 0) + (p.anhaenge || 0) + (p.grammatik || 0);
+    return { p, summe };
+  } catch { return null; }
+}
+
+/** Alleguer Wochenberichter (nëmmen liesen) -- gëtt fir d'Uweisung, den Drock/PDF an den Word-Export benotzt. */
+function WbLiesListe({ berichte }) {
+  return (
+    <div>
+      {berichte.map((w) => {
+        const pk = wbPunkteVun(w);
+        const ahaenk = String(w["Anhänge"] || "").split("\n").map((z) => z.trim()).filter(Boolean);
+        return (
+          <div className="wbl-item" key={w.ID}>
+            <h3 className="wbl-titel">{w.Woche} <span className="wbl-meta">· {w.Periode} · {w.Status}{pk ? ` · ${pk.summe} / 5 Punkten` : ""}</span></h3>
+            {w.Meilensteen && <p><strong>Meilensteen:</strong> {w.Meilensteen}</p>}
+            <p><strong>Zesummefaassung</strong><br /><TextMatUmbroch t={w.Zusammenfassung || "–"} /></p>
+            {w.Fortschritt && <p><strong>Fortschrëtt</strong><br /><TextMatUmbroch t={w.Fortschritt} /></p>}
+            {ahaenk.length > 0 && (
+              <p><strong>Ahänk</strong><br />
+                {ahaenk.map((z, j) => (z.startsWith("http")
+                  ? <span key={j}><a href={z}>📎 {z.split("/").pop() || "Datei " + (j + 1)}</a><br /></span>
+                  : <span key={j}>{z}<br /></span>))}
+              </p>
+            )}
+            {pk && (
+              <p><strong>Punkten:</strong> Zesummefaassung {pk.p.zusammenfassung || 0}/2 · Fortschrëtt {pk.p.fortschritt || 0}/1,5 · Ahänk {pk.p.anhaenge || 0}/1 · Grammatik {pk.p.grammatik || 0}/0,5</p>
+            )}
+            {w.Kommentar && <p className="wbl-kommentar"><strong>💬 Kommentar vum Betreier:</strong><br /><TextMatUmbroch t={w.Kommentar} /></p>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function App() {
   // M1: Nimm live vum Backend lueden, keng hart-codéiert Lëscht méi.
   const [personen, setPersonen] = useState([]);
@@ -133,7 +180,7 @@ function App() {
   const istGSE2 = currentSchueler?.klasse === "2GSE";
   const perioden = istGSE2 ? PERIODEN_2GSE : PERIODEN_1GSE;
   const nachVirStart = nachVirWochenberichtStart();
-  // De Prof soll de Formulaire scho virun der offizieller Startwoch (21.09.)
+  // De Prof soll de Formulaire schón virun der offizieller Startwoch (21.09.)
   // gesinn a Schüler kënnen erklären — nëmmen d'ofginn (Submit) bleift bis
   // dohinner gespaart. Fir Schüler bleift de ganze Formulaire wéi virdrun
   // verstoppt, well si nach näischt ofginn dierfen.
@@ -259,6 +306,35 @@ function App() {
     setPeriode(w.Periode);
   };
 
+  // ===== Alleguer Berichter: nëmmen liesen + PDF-/Word-Export =====
+  const alleSortiert = useMemo(
+    () => [...meng].sort((a, b) => (ersteDatumVunWoche(a.Woche)?.getTime() || 0) - (ersteDatumVunWoche(b.Woche)?.getTime() || 0)),
+    [meng]
+  );
+  const exportTitel = `Wochenberichter — ${currentSchueler?.virnumm ? currentSchueler.virnumm + " " : ""}(${currentSchueler?.name || ""}${currentSchueler?.klasse ? ", " + currentSchueler.klasse : ""})`;
+
+  const pdfExport = () => {
+    document.body.classList.add("print-wb");
+    window.print();
+    setTimeout(() => document.body.classList.remove("print-wb"), 800);
+  };
+
+  const wordExport = () => {
+    const inhalt = document.getElementById("druck-inhalt")?.innerHTML || "";
+    const html =
+      '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
+      '<head><meta charset="utf-8"><title>' + exportTitel + '</title>' +
+      '<style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#1c2621;} h1{font-size:18pt;color:#00A94F;} h3{font-size:12pt;margin:16pt 0 4pt;color:#294f3c;} p{margin:0 0 6pt;} a{color:#00A94F;}</style>' +
+      '</head><body>' + inhalt + '</body></html>';
+    const blob = new Blob(["﻿", html], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Wochenberichter_${(currentSchueler?.name || "Schueler").replace(/[^A-Za-z0-9_-]/g, "_")}.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="wrap">
       <header className="topbar">
@@ -296,6 +372,21 @@ function App() {
             )}
           </div>
         </section>
+
+        {schuelerId && !blockedByStart && meng.length > 0 && (
+          <section className="card">
+            <h2>📚 All meng Wochenberichter</h2>
+            <p className="hint-klengt">Zum Nolesen an Exportéieren (all Perioden). Hei kann näischt geswännert ginn.</p>
+            <div className="export-row">
+              <button type="button" className="btn-export" onClick={pdfExport}>📄 Als PDF</button>
+              <button type="button" className="btn-export" onClick={wordExport}>📝 Als Word</button>
+            </div>
+            <details className="wbl-details">
+              <summary>{meng.length} Bericht{meng.length === 1 ? "" : "er"} weisen</summary>
+              <WbLiesListe berichte={alleSortiert} />
+            </details>
+          </section>
+        )}
 
         {schuelerId && blockedByStart && (
           <div className="card">
@@ -461,6 +552,15 @@ function App() {
         )}
         {error && <div className="empty error">{error}</div>}
       </main>
+      {meng.length > 0 && (
+        <div className="druck-wb">
+          <div id="druck-inhalt">
+            <h1>{exportTitel}</h1>
+            <p>Stand: {new Date().toLocaleDateString("de-DE")}</p>
+            <WbLiesListe berichte={alleSortiert} />
+          </div>
+        </div>
+      )}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
@@ -502,6 +602,25 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .tabelle th { text-align: left; font-size: 11px; text-transform: uppercase; color: #6d7d74; padding: 6px 8px; border-bottom: 1px solid #eef1ef; }
 .tabelle td { padding: 7px 8px; font-size: 13px; border-bottom: 1px solid #f4f6f4; }
 .kommentar-zell { background: #eaf0f8; color: #294f3c; font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; padding: 9px 12px; border-radius: 6px; }
+.hint-klengt { font-size: 11.5px; color: #6d7d74; margin: 4px 0 10px; }
+.export-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.btn-export { font-size: 12.5px; font-weight: 700; color: #00A94F; background: #eef3ef; border: 1px solid #c9d5cd; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+.btn-export:hover { background: #e3ece5; }
+.wbl-details summary { font-size: 12.5px; font-weight: 700; color: #4576B5; cursor: pointer; }
+.wbl-item { border-top: 1px solid #eef1ef; padding: 10px 0 4px; }
+.wbl-titel { font-size: 13.5px; margin: 0 0 6px; color: #294f3c; }
+.wbl-meta { font-weight: 400; color: #6d7d74; font-size: 12px; }
+.wbl-item p { font-size: 12.5px; line-height: 1.55; margin: 0 0 6px; }
+.wbl-kommentar { background: #eaf0f8; padding: 8px 10px; border-radius: 7px; }
+.wbl-item a { color: #00A94F; font-weight: 600; text-decoration: none; }
+.druck-wb { display: none; }
+@media print {
+  body.print-wb .wrap > *:not(.druck-wb) { display: none !important; }
+  body.print-wb > button, body.print-wb > a { display: none !important; }
+  body.print-wb .druck-wb { display: block !important; padding: 10mm; }
+  body.print-wb .druck-wb h1 { font-size: 18pt; color: #00A94F; }
+  body.print-wb .wbl-item { page-break-inside: avoid; }
+}
 .cell-muted { color: #93a098; font-size: 12px; }
 .pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
 .pill-pending { background: #e6e9e6; color: #55625a; }
