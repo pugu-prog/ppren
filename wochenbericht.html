@@ -180,7 +180,7 @@ function App() {
   const istGSE2 = currentSchueler?.klasse === "2GSE";
   const perioden = istGSE2 ? PERIODEN_2GSE : PERIODEN_1GSE;
   const nachVirStart = nachVirWochenberichtStart();
-  // De Prof soll de Formulaire schón virun der offizieller Startwoch (21.09.)
+  // De Prof soll de Formulaire scho virun der offizieller Startwoch (21.09.)
   // gesinn a Schüler kënnen erklären — nëmmen d'ofginn (Submit) bleift bis
   // dohinner gespaart. Fir Schüler bleift de ganze Formulaire wéi virdrun
   // verstoppt, well si nach näischt ofginn dierfen.
@@ -376,7 +376,7 @@ function App() {
         {schuelerId && !blockedByStart && meng.length > 0 && (
           <section className="card">
             <h2>📚 All meng Wochenberichter</h2>
-            <p className="hint-klengt">Zum Nolesen an Exportéieren (all Perioden). Hei kann näischt geswännert ginn.</p>
+            <p className="hint-klengt">Zum Nolesen an Exportéieren (all Perioden). Hei kann näischt geännert ginn.</p>
             <div className="export-row">
               <button type="button" className="btn-export" onClick={pdfExport}>📄 Als PDF</button>
               <button type="button" className="btn-export" onClick={wordExport}>📝 Als Word</button>
