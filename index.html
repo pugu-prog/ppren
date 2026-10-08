@@ -568,7 +568,10 @@ function App() {
                 </section>
 
                 <section className="card">
-                  <h2>4. Aufgabenteilung</h2>
+                  <h2>4. Aufgaben</h2>
+                  <Field label="Meine Aufgaben" hint="Konkrete Arbeitsschritte, jeweils mit Theorie (für die Dokumentation) und Praxis (Bau, Messung, Versuch). Z. B.: „Generator – Theorie: Induktion erklären | Praxis: Spannung bei verschiedenen Drehzahlen messen“.">
+                    <textarea className="textarea" rows={6} value={plan.aufgabenteilung} onChange={(e) => update({ aufgabenteilung: e.target.value })} />
+                  </Field>
                   <label className="toggle-row">
                     <input type="checkbox" checked={plan.gruppenarbeit} onChange={(e) => update({ gruppenarbeit: e.target.checked })} />
                     <span>Ich arbeite mit einem Partner / einer Partnerin zusammen</span>
@@ -580,9 +583,6 @@ function App() {
                           <option value="">– auswählen –</option>
                           {SCHUELER.filter((s) => s.id !== schuelerId).map((s) => <option key={s.id} value={s.id}>{s.virnumm ? `${s.virnumm} — ` : ""}{s.name}</option>)}
                         </select>
-                      </Field>
-                      <Field label="Mein individueller Aufgabenbereich">
-                        <textarea className="textarea" rows={3} value={plan.aufgabenteilung} onChange={(e) => update({ aufgabenteilung: e.target.value })} />
                       </Field>
                     </div>
                   )}

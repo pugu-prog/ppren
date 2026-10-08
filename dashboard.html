@@ -35,6 +35,95 @@ function statusMeta(status) {
   return { key: "draft", label: "Entwurf" };
 }
 
+// ===== Plang-Check: automatesch Regelen (Kritären aus dem Bewäertungsraster) =====
+// D'Texter riichte sech un de Schüler (Däitsch, "du"), well se als Kommentar
+// bei him landen. De Prof kann se am Plang-Check-Fënster änneren.
+const GSE_WIERDER = /energie|strom|watt|kwh|solar|wind|luft|co2|co₂|emission|klima|wasser|abwasser|meer|boden|erosion|kompost|abfall|recycl|upcycl|wiederverw|müll|plastik|mobilit|verkehr|transport|nachhaltig|umwelt|environment|sustainab|renewable/i;
+const ZWECK_WIERDER = /kinder|schüler|klasse|publikum|besucher|zeig|erklär|vorführ|demonstr|workshop|lehr|lern|children|pupils|students|show|explain|teach/i;
+
+function plangDetailsVun(p) {
+  try { return JSON.parse(p["Projektplan-Details (JSON)"] || "{}") || {}; } catch (e) { return {}; }
+}
+
+function datumVunText(t) {
+  const s = String(t || "");
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  return null;
+}
+
+function plangRegelCheck(p) {
+  const d = plangDetailsVun(p);
+  const t = (x) => String(x || "").trim();
+  const punkte = [];
+  const add = (feld, prioritaet, text) => punkte.push({ feld, prioritaet, text });
+  const ass1GSE = /1GSE/i.test(String(p.Klasse || ""));
+
+  if (!p["Projektplan-Details (JSON)"]) {
+    add("Allgemein", "wichtig", "Dein Projektplan ist noch nicht gespeichert. Fülle das Formular aus und speichere es.");
+    return punkte;
+  }
+
+  const titel = t(p.Titel);
+  if (!titel) add("Titel", "wichtig", "Gib deinem Projekt einen kurzen, klaren Titel.");
+  else if (titel.length > 90 || titel.includes("?")) add("Titel", "klein", "Formuliere den Titel kürzer und als Aussage, nicht als Frage (höchstens eine Zeile).");
+
+  const inhalt = t(d.inhalt);
+  if (!inhalt) add("Beschreibung", "wichtig", "Die Beschreibung fehlt. Beschreibe, was du genau baust oder untersuchst.");
+  else if (inhalt.length < 500) add("Beschreibung", "wichtig", "Deine Beschreibung ist zu kurz. Beschreibe konkret: Aufbau, Material/Bauteile, Versuche und Messungen. Füge eine Skizze als Anhang hinzu.");
+
+  const motivation = t(d.motivation);
+  if (!motivation) add("Motivation", "wichtig", "Die Motivation fehlt. Warum hast du dieses Projekt gewählt, und was hat es mit Umweltwissenschaften zu tun?");
+  else if (motivation.length < 200) add("Motivation", "mittel", "Deine Motivation ist sehr kurz. Erkläre, warum dich das Thema interessiert und welchen Bezug es zu den Umweltwissenschaften hat.");
+
+  const ziele = t(d.ziele);
+  const zielDatumer = (ziele.match(/\b\d{1,2}\.\s?(\d{1,2}\.)?/g) || []).length;
+  const zielListe = ziele.split(/\n/).filter((z) => /^\s*[-•*]/.test(z)).length;
+  if (!ziele) add("Ziele", "wichtig", "Die Ziele fehlen. Formuliere ein übergeordnetes Ziel und 3–5 messbare Teilziele.");
+  else if (zielDatumer >= 3) add("Ziele", "wichtig", "Im Feld „Ziele“ stehen vor allem Termine. Termine gehören zu den Meilensteinen. Formuliere hier echte Ziele: Was soll am Ende erreicht und überprüfbar sein?");
+  else if (zielListe >= 8) add("Ziele", "mittel", "Unter „Ziele“ steht eine lange Liste von Arbeitsschritten. Verschiebe sie ins Feld „Aufgaben“ und schreibe unter „Ziele“ 3–5 überprüfbare Ziele.");
+  else if (ziele.length < 150) add("Ziele", "mittel", "Deine Ziele sind zu knapp. Formuliere ein übergeordnetes Ziel und messbare Teilziele (z. B. Leistung, Anzahl Messungen, Vorführung).");
+  if (ziele && !ZWECK_WIERDER.test(ziele)) add("Ziele", "mittel", "Übergeordnetes Ziel: Wozu dient dein Ergebnis? Wo wird es eingesetzt, wer (z. B. Kinder, Mitschüler) lernt was daraus, und wie vermittelst du es?");
+
+  const themen = d.gseThemen || [];
+  if (themen.length === 0) add("Umweltbezug", "mittel", "Wähle im Formular 1–3 GSE-Themen aus, zu denen dein Projekt passt.");
+  if (!GSE_WIERDER.test(motivation + " " + ziele)) add("Umweltbezug", "wichtig", "Der Bezug zu den Umweltwissenschaften fehlt. Zeige in Motivation und Zielen, wie dein Projekt mit Energie, Luft, Wasser, Boden, Abfall oder Mobilität zusammenhängt.");
+
+  const aufgaben = t(d.aufgabenteilung);
+  if (aufgaben.length < 50) add("Aufgaben", "wichtig", "Das Feld „Aufgaben“ ist leer oder sehr kurz. Gib konkrete Arbeitsschritte an – jeweils mit Theorie (für deine Dokumentation) und Praxis (Bau, Messung, Versuch).");
+
+  const ms = (d.meilensteine || []).filter((m) => t(m.beschreibung || m.titel));
+  if (ms.length === 0) add("Meilensteine", "wichtig", "Du hast keine Meilensteine. Plane mindestens 4–6 Meilensteine mit Datum und einem überprüfbaren Ergebnis.");
+  else {
+    if (ms.length < 4) add("Meilensteine", "mittel", "Du hast nur wenige Meilensteine. Plane mindestens 4–6, verteilt über das " + (ass1GSE ? "Semester" : "Trimester") + ".");
+    const datumer = ms.map((m) => datumVunText(m.datum));
+    if (datumer.some((x) => !x)) add("Meilensteine", "mittel", "Nicht alle Meilensteine haben ein Datum. Gib für jeden ein Soll-Datum an.");
+    const gutt = datumer.filter((x) => x);
+    let reiefolleg = true, zeNoh = false;
+    for (let i = 1; i < gutt.length; i++) {
+      if (gutt[i] < gutt[i - 1]) reiefolleg = false;
+      if (Math.abs(gutt[i] - gutt[i - 1]) < 2 * 86400000) zeNoh = true;
+    }
+    if (!reiefolleg) add("Meilensteine", "mittel", "Deine Meilensteine sind nicht in zeitlicher Reihenfolge. Sortiere sie nach Datum und prüfe, ob die Reihenfolge Sinn ergibt.");
+    if (zeNoh) add("Meilensteine", "klein", "Zwei Meilensteine liegen nur einen Tag auseinander. Fasse sie zusammen oder plane mehr Zeit ein.");
+    const themaOnly = ms.filter((m) => t(m.beschreibung || m.titel).split(/\s+/).length <= 3).length;
+    if (themaOnly >= Math.ceil(ms.length / 2)) add("Meilensteine", "mittel", "Viele Meilensteine nennen nur ein Thema. Formuliere jeden als überprüfbares Ergebnis (z. B. „Prototyp gebaut und getestet“ statt „Prototyp“).");
+    if (ass1GSE) add("Meilensteine", "klein", "Trage bei jedem Meilenstein zusätzlich das Ist-Datum ein, sobald er erreicht ist (Soll-Ist-Vergleich).");
+  }
+
+  if (!d.kostenplanNoetig) add("Kostenplan", "mittel", "Du hast „Kostenplan nicht erforderlich“ angegeben. Brauchst du wirklich kein Material (Bauteile, Sensoren, Verbrauchsmaterial)? Wenn doch, erstelle einen Kostenplan.");
+  else {
+    const kosten = d.kosten || [];
+    if (kosten.length === 0) add("Kostenplan", "wichtig", "Dein Kostenplan ist leer. Liste alle Positionen mit Preis auf.");
+    if (kosten.some((k) => !(parseFloat(k.betrag) > 0))) add("Kostenplan", "mittel", "Einige Positionen haben keinen Betrag oder 0 €. Gib für jede Position einen Preis an (mit Link oder Angebot) oder schreibe dazu, dass das Teil schon vorhanden ist.");
+    const summ = kosten.reduce((a, k) => a + (parseFloat(k.betrag) || 0), 0);
+    if (summ > 500) add("Kostenplan", "wichtig", "Dein Kostenplan liegt über 500 €. Kürze oder begründe die Positionen.");
+  }
+  return punkte;
+}
+
 const FEEDBACK_MAX_MB = 10;
 
 function App() {
@@ -315,6 +404,102 @@ function App() {
     oppen: { label: "⛔ oppen", klass: "check-oppen" },
   };
 
+  // ===== Plang-Check: automatesch Regelen + KI-Entworf → Kommentaren =====
+  const [plangCheckModal, setPlangCheckModal] = useState(null);
+  const [plangCheckPunkte, setPlangCheckPunkte] = useState([]);
+  const [plangKiLaeuft, setPlangKiLaeuft] = useState(false);
+  const [plangKiFehler, setPlangKiFehler] = useState(null);
+  const [plangKiLehrer, setPlangKiLehrer] = useState(null);
+  const [plangCheckSenden, setPlangCheckSenden] = useState(false);
+
+  const oeffnePlangCheck = (p) => {
+    const regelen = plangRegelCheck(p).map((k, i) => ({ ...k, id: "r" + i, quell: "Regel", aktiv: k.prioritaet !== "klein" }));
+    setPlangCheckPunkte(regelen);
+    setPlangKiFehler(null);
+    setPlangKiLehrer(null);
+    setPlangCheckModal({ schueler: p.Schüler, klasse: p.Klasse, titel: p.Titel });
+  };
+  const schliesPlangCheck = () => {
+    if (plangKiLaeuft || plangCheckSenden) return;
+    setPlangCheckModal(null);
+  };
+  const plangPunktAendern = (id, patch) =>
+    setPlangCheckPunkte((l) => l.map((k) => (k.id === id ? { ...k, ...patch } : k)));
+
+  const plangKiStarten = async () => {
+    if (!plangCheckModal) return;
+    if (!window.confirm("De Projektplang-Text gëtt elo un d'Claude-API geschéckt, fir e Feedback-Entworf ze maachen. Weiderfueren?")) return;
+    setPlangKiLaeuft(true);
+    setPlangKiFehler(null);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ typ: "plangKiFeedback", token: window.PPREN_SESSION?.token || "", schueler: plangCheckModal.schueler, klasse: plangCheckModal.klasse }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      const r = data.resultat || {};
+      const nei = (r.kommentare || []).map((k, i) => ({
+        id: "k" + Date.now() + i, quell: "KI", feld: k.feld, prioritaet: k.prioritaet, text: k.text, aktiv: k.prioritaet !== "klein",
+      }));
+      if ((r.aufgaben_vorschlag || []).length > 0) {
+        nei.push({
+          id: "ka" + Date.now(), quell: "KI", feld: "Aufgaben", prioritaet: "wichtig", aktiv: true,
+          text: "Vorschlag für deine Aufgaben (jeweils Theorie und Praxis):\n" +
+            r.aufgaben_vorschlag.map((a) => `• ${a.schritt} – Theorie: ${a.theorie} | Praxis: ${a.praxis}`).join("\n"),
+        });
+      }
+      if ((r.meilenstein_vorschlag || []).length > 0) {
+        nei.push({
+          id: "km" + Date.now(), quell: "KI", feld: "Meilensteine", prioritaet: "mittel", aktiv: true,
+          text: "Vorschlag für deine Meilensteine (überprüfbare Ergebnisse, Daten bitte anpassen):\n" +
+            r.meilenstein_vorschlag.map((m) => `• ${m.datum}: ${m.ergebnis}`).join("\n"),
+        });
+      }
+      setPlangCheckPunkte((l) => [...l, ...nei]);
+      setPlangKiLehrer(r.fuer_lehrer || null);
+    } catch (e) {
+      setPlangKiFehler(e.message);
+    } finally {
+      setPlangKiLaeuft(false);
+    }
+  };
+
+  const plangCheckAlsKommentar = async () => {
+    if (!plangCheckModal) return;
+    const auswiel = plangCheckPunkte.filter((k) => k.aktiv && String(k.text || "").trim());
+    if (auswiel.length === 0) return;
+    if (!window.confirm(`${auswiel.length} Kommentar(en) un de Schüler schécken?`)) return;
+    setPlangCheckSenden(true);
+    let ok = 0;
+    try {
+      for (const k of auswiel) {
+        const res = await fetch(WEB_APP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            typ: "plangKommentarHinzefuegen", token: window.PPREN_SESSION?.token || "",
+            schueler: plangCheckModal.schueler, klasse: plangCheckModal.klasse,
+            text: `[${k.feld}] ${String(k.text).trim()}`,
+          }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+        ok++;
+      }
+      setExpandedSchueler(plangCheckModal.schueler);
+      setPlangCheckModal(null);
+      lade();
+    } catch (e) {
+      alert(`Nëmmen ${ok} vun ${auswiel.length} Kommentaren gespäichert: ` + e.message);
+      lade();
+    } finally {
+      setPlangCheckSenden(false);
+    }
+  };
+  const PRIO_LABEL = { wichtig: "🔴 wichteg", mittel: "🟠 mëttel", klein: "⚪ kleng" };
+
   const ausgiFuer = (schueler) => ausgaben.filter((a) => a.Schüler === schueler).reduce((s, a) => s + (Number(a.Betrag) || 0), 0);
 
   const statusAendern = async (schueler, periode, neuerStatus) => {
@@ -492,6 +677,9 @@ function App() {
                           </button>
                           <button type="button" className="btn-gen" onClick={() => oeffneFeedbackModal(p.Schüler, p.Klasse)} title="Feedback als PDF eroplueden">
                             📄 PDF{fbn > 0 ? ` (${fbn})` : ""}
+                          </button>
+                          <button type="button" className="btn-gen" onClick={() => oeffnePlangCheck(p)} title="Plang-Check: automatesch Kritären + KI-Entworf → Kommentaren">
+                            🧪 Plang-Check
                           </button>
                           {fbn > 0 && (
                             <button
@@ -748,6 +936,70 @@ function App() {
         </div>
       )}
 
+      {plangCheckModal && (
+        <div className="modal-overlay" onClick={schliesPlangCheck}>
+          <div className="modal-box modal-box-breet" onClick={(e) => e.stopPropagation()}>
+            <h3>🧪 Plang-Check — {ufweis(plangCheckModal.schueler)}</h3>
+            <p className="modal-hint">
+              {plangCheckModal.titel ? <><b>{plangCheckModal.titel}</b> · </> : null}
+              Automatesch Kritären aus dem Bewäertungsraster. Mat „KI-Entworf“ kommen nach Kommentaren, Aufgaben (Theorie/Praxis) a Meilesteng derbäi.
+              Ugehaakte Punkte ginn als Kommentar un de Schüler; den Text kanns de virdrun änneren.
+            </p>
+            {plangKiFehler && <div className="check-fehler">{plangKiFehler}</div>}
+            {plangKiLehrer && (
+              <div className="pc-lehrer">
+                <div className="pc-lehrer-titel">Nëmme fir d'Léierpersonal</div>
+                {plangKiLehrer.zusammenfassung && <p>{plangKiLehrer.zusammenfassung}</p>}
+                {plangKiLehrer.raster_schaetzung && <p><b>Raster (Aschätzung):</b> {plangKiLehrer.raster_schaetzung}</p>}
+                {plangKiLehrer.ki_indizien && <p><b>KI-Indizien:</b> {plangKiLehrer.ki_indizien}</p>}
+                {(plangKiLehrer.gespraechsfragen || []).length > 0 && (
+                  <>
+                    <b>Froen fir d'Gespréich:</b>
+                    <ul>{plangKiLehrer.gespraechsfragen.map((f, i) => <li key={i}>{f}</li>)}</ul>
+                  </>
+                )}
+              </div>
+            )}
+            {plangCheckPunkte.length === 0 ? (
+              <p className="modal-hint">Keng automatesch Punkten — de Plang erfëllt d'Basis-Kritären.</p>
+            ) : (
+              <ul className="pc-liste">
+                {plangCheckPunkte.map((k) => (
+                  <li key={k.id} className={`pc-${k.prioritaet}${k.aktiv ? "" : " pc-aus"}`}>
+                    <label className="pc-kopf">
+                      <input type="checkbox" checked={k.aktiv} onChange={(e) => plangPunktAendern(k.id, { aktiv: e.target.checked })} />
+                      <span className="pc-feld">{k.feld}</span>
+                      <span className="pc-prio">{PRIO_LABEL[k.prioritaet] || k.prioritaet}</span>
+                      <span className="pc-quell">{k.quell}</span>
+                    </label>
+                    <textarea
+                      className="pc-text"
+                      value={k.text}
+                      rows={Math.min(8, Math.max(2, String(k.text).split("\n").length + 1))}
+                      onChange={(e) => plangPunktAendern(k.id, { text: e.target.value })}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="btn-gen" onClick={schliesPlangCheck} disabled={plangKiLaeuft || plangCheckSenden}>Zoumaachen</button>
+              <button type="button" className="btn-gen" onClick={plangKiStarten} disabled={plangKiLaeuft || plangCheckSenden}>
+                {plangKiLaeuft ? "KI schafft… (bis zu 1 Minutt)" : "🤖 KI-Entworf"}
+              </button>
+              <button
+                type="button"
+                className="btn-gen btn-gen-primary"
+                onClick={plangCheckAlsKommentar}
+                disabled={plangKiLaeuft || plangCheckSenden || plangCheckPunkte.filter((k) => k.aktiv).length === 0}
+              >
+                {plangCheckSenden ? "Schéckt…" : `💬 ${plangCheckPunkte.filter((k) => k.aktiv).length} als Kommentar schécken`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {feedbackModal && (
         <div className="modal-overlay" onClick={schliesFeedbackModal}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -901,6 +1153,21 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
 .btn-gen-primary { color: #fff; background: #00A94F; border-color: #00A94F; }
 .btn-gen-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.pc-liste { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.pc-liste li { padding: 8px 10px; border-radius: 8px; border-left: 4px solid #c9d5cd; background: #fafbfa; }
+.pc-liste li.pc-wichtig { border-left-color: #c0392b; background: #fdf2f0; }
+.pc-liste li.pc-mittel { border-left-color: #d99a2b; background: #fffaf0; }
+.pc-liste li.pc-klein { border-left-color: #c9d5cd; }
+.pc-liste li.pc-aus { opacity: 0.55; }
+.pc-kopf { display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 4px; }
+.pc-feld { font-size: 12.5px; font-weight: 800; color: #1c2621; }
+.pc-prio { font-size: 11px; font-weight: 700; color: #55625a; }
+.pc-quell { margin-left: auto; font-size: 10.5px; font-weight: 700; color: #6d7d74; background: #eef3ef; border-radius: 5px; padding: 1px 6px; }
+.pc-text { width: 100%; box-sizing: border-box; border: 1px solid #dbe4de; border-radius: 6px; padding: 6px 8px; font-size: 13px; font-family: inherit; line-height: 1.45; resize: vertical; background: #fff; }
+.pc-lehrer { font-size: 12.5px; line-height: 1.5; color: #4a3a12; background: #fbf3e2; border: 1px solid #f0d29a; border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; }
+.pc-lehrer p { margin: 0 0 6px; }
+.pc-lehrer ul { margin: 4px 0 0; padding-left: 18px; }
+.pc-lehrer-titel { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #8a5a12; margin-bottom: 4px; }
 </style>
 </body>
 </html>
