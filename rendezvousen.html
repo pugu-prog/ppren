@@ -580,7 +580,7 @@ function App() {
             </div>
             <label className="field">
               <span className="field-label">Notiz fir all (optional — kënnt an d'Mail)</span>
-              <textarea className="textarea" rows={2} value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder="z. B. Bréng däi Projektplang an d'Dokumentatioun mat." />
+              <textarea className="textarea" rows={2} value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder="z. B. Raum B214" />
             </label>
             <button className="btn btn-sec" disabled={klassSchueler.length - ofgewielt.size === 0} onClick={() => maachVirschlag()}>
               🔄 Virschlag maachen
