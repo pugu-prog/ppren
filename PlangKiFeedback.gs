@@ -10,8 +10,10 @@
 //   4. Deploy → Manage deployments → ✏️ Edit → New version.
 //
 // De Plang gëtt aus der Iwwersiicht-Sheet gelies (net vum Browser geschéckt).
-// D'Resultat gëtt NET gespäichert: de Prof wielt am Dashboard aus, wat als
-// Kommentar un de Schüler geet.
+// All KI-Entworf gëtt am Sheet-Tab "PlangKiFeedback" gespäichert (mat Datum,
+// Prof a Plang-Stand) — sou bleift d'Entwécklung vum Schüler nokucken, an en
+// zweeten Opruff kascht näischt. Mat data.nurLaden = true gëtt just d'Historique
+// zréckginn (keen API-Opruff). Wat un de Schüler geet, wielt de Prof am Dashboard.
 // =====================================================================
 
 const KI_FEEDBACK_MODELL = "claude-opus-5-5";
@@ -20,6 +22,12 @@ function plangKiFeedback(data) {
   const session = pruefSession(data.token);
   if (!session.valid || session.rolle !== "Prof") {
     return { ok: false, error: "Nëmme Proffen dierfen de KI-Feedback benotzen." };
+  }
+  if (data.nurLaden) {
+    return { ok: true, historique: kiFeedbackHistorique_(data.schueler) };
+  }
+  if (data.pdf) {
+    return feedbackPdfErstellen_(data);
   }
   const apiKey = PropertiesService.getScriptProperties().getProperty("ANTHROPIC_API_KEY");
   if (!apiKey) {
@@ -81,7 +89,36 @@ function plangKiFeedback(data) {
   } catch (e) {
     return { ok: false, error: "D'KI-Äntwert war kee gültegen JSON." };
   }
-  return { ok: true, resultat, modell: antwort.model };
+  const erstallt = Utilities.formatDate(new Date(), "Europe/Luxembourg", "dd.MM.yyyy HH:mm");
+  const id = Utilities.getUuid();
+  kiFeedbackSheet_().appendRow([id, plang.schueler, plang.klasse, erstallt, session.numm || "", plang.stand, antwort.model || KI_FEEDBACK_MODELL, JSON.stringify(resultat)]);
+  return { ok: true, resultat, modell: antwort.model, eintrag: { id, erstallt, vunProf: session.numm || "", planStand: plang.stand, resultat } };
+}
+
+function kiFeedbackSheet_() {
+  const ss = SpreadsheetApp.openById(OVERVIEW_SHEET_ID);
+  let sheet = ss.getSheetByName("PlangKiFeedback");
+  if (!sheet) {
+    sheet = ss.insertSheet("PlangKiFeedback");
+    sheet.appendRow(["ID", "Schüler", "Klasse", "Erstallt", "VunProf", "Plang-Stand", "Modell", "Resultat (JSON)"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+// All gespäichert KI-Entwërf vun engem Schüler, nei → al.
+function kiFeedbackHistorique_(schueler) {
+  const werte = kiFeedbackSheet_().getDataRange().getValues();
+  const lescht = [];
+  for (let i = 1; i < werte.length; i++) {
+    if (werte[i][1] !== schueler) continue;
+    let resultat = null;
+    try { resultat = JSON.parse(werte[i][7] || "null"); } catch (e) { resultat = null; }
+    if (!resultat) continue;
+    const zeit = (v) => (v instanceof Date ? Utilities.formatDate(v, "Europe/Luxembourg", "dd.MM.yyyy HH:mm") : String(v || ""));
+    lescht.push({ id: werte[i][0], erstallt: zeit(werte[i][3]), vunProf: werte[i][4], planStand: zeit(werte[i][5]), resultat });
+  }
+  return lescht.reverse();
 }
 
 function kiPlangLiesen_(schueler) {
@@ -91,11 +128,15 @@ function kiPlangLiesen_(schueler) {
     if (werte[i][0] === schueler) {
       let details = {};
       try { details = JSON.parse(werte[i][9] || "{}"); } catch (e) { details = {}; }
+      const stand = werte[i][5] instanceof Date
+        ? Utilities.formatDate(werte[i][5], "Europe/Luxembourg", "dd.MM.yyyy HH:mm")
+        : String(werte[i][5] || "");
       return {
         schueler: werte[i][0],
         klasse: String(werte[i][1] || ""),
         titel: String(werte[i][3] || ""),
         status: String(werte[i][4] || ""),
+        stand,
         details,
       };
     }
@@ -222,3 +263,154 @@ const KI_FEEDBACK_SCHEMA = {
     },
   },
 };
+
+
+// =====================================================================
+// PDF-Export (LaTeX, selwecht Deckblat/Layout wéi de Projektplang-PDF)
+// data.pdf = { fuerProffen: bool, punkte: [{feld, text, quell, aktiv}], aktivId }
+// Gëtt d'PDF als base64 zréck (Download am Browser), späichert näischt am Drive.
+// =====================================================================
+function feedbackPdfErstellen_(data) {
+  const plang = kiPlangLiesen_(data.schueler);
+  if (!plang) return { ok: false, error: "Kee Projektplang fonnt fir " + data.schueler + "." };
+  const fuerProffen = !!data.pdf.fuerProffen;
+  const historique = kiFeedbackHistorique_(data.schueler);
+  const aktiv = historique.find((h) => String(h.id) === String(data.pdf.aktivId)) || historique[0] || null;
+
+  const tex = feedbackPdfLatex_(plang, data.pdf.punkte || [], fuerProffen, aktiv, historique);
+  const seVectorBlob = DriveApp.getFileById(LOGO_VECTOR_PDF_ID).getBlob();
+  const ltettBlob = UrlFetchApp.fetch(LTETT_LOGO_URL).getBlob();
+  const payload = {
+    compiler: "pdflatex",
+    resources: [
+      { main: true, content: tex },
+      { path: "se_logo_vector.pdf", file: Utilities.base64Encode(seVectorBlob.getBytes()) },
+      { path: "ltett_logo.png", file: Utilities.base64Encode(ltettBlob.getBytes()) },
+    ],
+  };
+  let antwort, feeler;
+  for (let versuch = 0; versuch < 2; versuch++) {
+    try {
+      antwort = UrlFetchApp.fetch("https://latex.ytotech.com/builds/sync", {
+        method: "post", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true,
+      });
+      if (antwort.getResponseCode() === 201) break;
+      feeler = "HTTP " + antwort.getResponseCode() + ": " + String(antwort.getContentText()).substring(0, 300);
+    } catch (e) {
+      feeler = e.message;
+    }
+    if (versuch === 0) Utilities.sleep(2000);
+  }
+  if (!antwort || antwort.getResponseCode() !== 201) {
+    return { ok: false, error: "LaTeX-Kompiléierung feelgeschloen: " + (feeler || "onbekannte Feeler") };
+  }
+  const nummDeel = String(anzeigeNummFirSchueler(plang.schueler) || plang.schueler).replace(/[^\wÀ-ÿ.-]+/g, "_");
+  return {
+    ok: true,
+    dateiname: "Feedback_Projektplan_" + nummDeel + (fuerProffen ? "_LEHRER" : "") + ".pdf",
+    pdfBase64: Utilities.base64Encode(antwort.getBlob().getBytes()),
+  };
+}
+
+function feedbackPdfLatex_(plang, punkte, fuerProffen, aktiv, historique) {
+  const E = latexEscape;
+  const EA = latexEscapeAbsaetz;
+  const betreuer = String(kiBetreuerVun_(plang.schueler) || "");
+  const deckblat = baueDeckblattFragmentLatex(fuerProffen ? "Feedback – Lehrerversion" : "Feedback zum Projektplan", {
+    schueler: plang.schueler, klasse: plang.klasse, betreuer, betreuer2: "",
+  });
+
+  const reiefolleg = ["Allgemein", "Titel", "Beschreibung", "Motivation", "Umweltbezug", "Ziele", "Aufgaben", "Meilensteine", "Kostenplan", "Sicherheit", "Sprache"];
+  const gewielt = punkte.filter((k) => String(k.text || "").trim() && (fuerProffen || k.aktiv));
+  const felder = [];
+  gewielt.forEach((k) => { if (felder.indexOf(k.feld) < 0) felder.push(k.feld); });
+  felder.sort((a, b) => ((reiefolleg.indexOf(a) + 99) % 99) - ((reiefolleg.indexOf(b) + 99) % 99));
+
+  const punkteTex = felder.map((f) => {
+    const items = gewielt.filter((k) => k.feld === f).map((k) => {
+      const meta = fuerProffen ? ` {\\color{selightgray}\\footnotesize (${E(k.quell || "")}${k.aktiv ? "" : ", nicht gesendet"})}` : "";
+      const text = EA(String(k.text).trim()).replace(/\n\n/g, "\\\\\n");
+      return `\\item ${k.aktiv || !fuerProffen ? "" : "{\\color{segray}"}${text}${k.aktiv || !fuerProffen ? "" : "}"}${meta}`;
+    }).join("\n");
+    return `{\\color{seblue}\\large\\bfseries ${E(f)}}\\par\\vspace{-2mm}\n\\begin{itemize}[leftmargin=6mm, itemsep=1.5mm, topsep=1mm]\n${items}\n\\end{itemize}\n\\vspace{2mm}`;
+  }).join("\n\n");
+
+  let lehrerTex = "";
+  if (fuerProffen && aktiv && aktiv.resultat && aktiv.resultat.fuer_lehrer) {
+    const l = aktiv.resultat.fuer_lehrer;
+    const fragen = (l.gespraechsfragen || []).map((f) => `\\item ${E(f)}`).join("\n");
+    lehrerTex = `\\noindent\\fcolorbox{seorange}{selehrer}{\\begin{minipage}{\\dimexpr\\linewidth-2\\fboxsep-2\\fboxrule}
+{\\color{seorange}\\bfseries\\small NUR FÜR DAS LEHRPERSONAL ~~\$\\cdot\$~~ KI-Entwurf vom ${E(aktiv.erstallt)}${aktiv.planStand ? ", Plan-Stand " + E(aktiv.planStand) : ""}}\\\\[1mm]
+${l.zusammenfassung ? EA(l.zusammenfassung) + "\\\\[1mm]" : ""}
+${l.raster_schaetzung ? "\\textbf{Raster (KI-Einschätzung):} " + E(l.raster_schaetzung) + "\\\\[1mm]" : ""}
+${l.ki_indizien ? "\\textbf{KI-Indizien:} " + E(l.ki_indizien) + "\\\\[1mm]" : ""}
+${fragen ? "\\textbf{Fragen für das Gespräch:}\n\\begin{itemize}[leftmargin=6mm, itemsep=0.5mm, topsep=1mm]\n" + fragen + "\n\\end{itemize}" : ""}
+\\end{minipage}}\\par\n\\vspace{6mm}\n`;
+  }
+
+  let entwTex = "";
+  if (fuerProffen && historique.length > 1) {
+    const zeilen = historique.slice().reverse().map((h) =>
+      `${E(h.erstallt)} & ${E(h.planStand || "--")} & ${E((h.resultat && h.resultat.fuer_lehrer && h.resultat.fuer_lehrer.raster_schaetzung) || "--")} \\\\\n\\hline`).join("\n");
+    entwTex = `{\\color{seblue}\\large\\bfseries Entwicklung}\\par\\vspace{1mm}
+\\begin{tabular}{|p{30mm}|p{30mm}|p{95mm}|}
+\\hline
+\\textbf{KI-Entwurf} & \\textbf{Plan-Stand} & \\textbf{Raster (KI-Einschätzung)} \\\\
+\\hline
+${zeilen}
+\\end{tabular}\\par
+\\vspace{6mm}\n`;
+  }
+
+  const datum = Utilities.formatDate(new Date(), "Europe/Luxembourg", "dd.MM.yyyy");
+  const fuss = fuerProffen ? "" : `\\vspace{4mm}\n{\\color{segray}\\small Arbeite diese Punkte in deinen Projektplan in PPREN ein und gib ihn erneut ab. Halte Gespräche mit deinen Betreuern selbst schriftlich fest -- gleich danach, gerne auch mit KI (aber kontrolliere das Ergebnis).}`;
+
+  return `\\documentclass[a4paper,11pt]{article}
+\\usepackage[T1]{fontenc}
+\\usepackage[utf8]{inputenc}
+\\usepackage[ngerman]{babel}
+\\usepackage{geometry}
+\\geometry{margin=0mm}
+\\usepackage{textpos}
+\\usepackage{xcolor}
+\\usepackage{graphicx}
+\\usepackage[scaled]{helvet}
+\\usepackage{enumitem}
+\\usepackage{parskip}
+\\renewcommand{\\familydefault}{\\sfdefault}
+\\setlength{\\parindent}{0mm}
+\\setlength{\\TPHorizModule}{1mm}
+\\setlength{\\TPVertModule}{1mm}
+\\textblockorigin{0mm}{0mm}
+\\definecolor{segreen}{HTML}{4CAF50}
+\\definecolor{seblack}{HTML}{1c2621}
+\\definecolor{seorange}{HTML}{E8952E}
+\\definecolor{seblue}{HTML}{3A6EA5}
+\\definecolor{segray}{HTML}{55625A}
+\\definecolor{selightgray}{HTML}{93A098}
+\\definecolor{seteal}{HTML}{3A9BB5}
+\\definecolor{selehrer}{HTML}{FBF3E2}
+\\newcommand{\\selogo}[1]{\\includegraphics[trim=162pt 271pt 160pt 297pt, clip, width=#1]{se_logo_vector.pdf}}
+\\begin{document}
+\\pagestyle{empty}
+${deckblat}
+\\clearpage
+\\newgeometry{margin=25mm, top=20mm}
+\\pagestyle{plain}
+\\pagenumbering{arabic}
+{\\color{segreen}\\LARGE\\bfseries ${fuerProffen ? "Feedback (Lehrerversion)" : "Feedback zu deinem Projektplan"}}\\\\[2mm]
+{\\color{segray}\\normalsize ${E(anzeigeNummFirSchueler(plang.schueler))} ~~\$\\cdot\$~~ ${E(plang.klasse)} ~~\$\\cdot\$~~ ${E(plang.titel || "")}}\\\\[1mm]
+{\\color{segray}\\small Feedback vom ${E(datum)}${plang.stand ? " ~~\$\\cdot\$~~ Projektplan vom " + E(plang.stand) : ""}}
+\\vspace{6mm}
+
+${lehrerTex}${entwTex}${punkteTex || "Keine Punkte ausgewählt."}
+${fuss}
+\\end{document}
+`;
+}
+
+function kiBetreuerVun_(schueler) {
+  const werte = SpreadsheetApp.openById(OVERVIEW_SHEET_ID).getSheets()[0].getDataRange().getValues();
+  for (let i = 1; i < werte.length; i++) if (werte[i][0] === schueler) return werte[i][2];
+  return "";
+}

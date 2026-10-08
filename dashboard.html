@@ -411,13 +411,63 @@ function App() {
   const [plangKiFehler, setPlangKiFehler] = useState(null);
   const [plangKiLehrer, setPlangKiLehrer] = useState(null);
   const [plangCheckSenden, setPlangCheckSenden] = useState(false);
+  const [plangKiHistorique, setPlangKiHistorique] = useState([]);
+  const [plangKiAktivId, setPlangKiAktivId] = useState(null);
+  const [plangKiLaedt, setPlangKiLaedt] = useState(false);
+
+  // KI-Resultat → Punkten an der Lëscht (Kommentaren + Aufgaben- a Meilesteen-Virschlag)
+  const kiPunkteVunResultat = (r, praefix) => {
+    const nei = (r.kommentare || []).map((k, i) => ({
+      id: praefix + "k" + i, quell: "KI", feld: k.feld, prioritaet: k.prioritaet, text: k.text, aktiv: k.prioritaet !== "klein",
+    }));
+    if ((r.aufgaben_vorschlag || []).length > 0) {
+      nei.push({
+        id: praefix + "a", quell: "KI", feld: "Aufgaben", prioritaet: "wichtig", aktiv: true,
+        text: "Vorschlag für deine Aufgaben (jeweils Theorie und Praxis):\n" +
+          r.aufgaben_vorschlag.map((a) => `• ${a.schritt} – Theorie: ${a.theorie} | Praxis: ${a.praxis}`).join("\n"),
+      });
+    }
+    if ((r.meilenstein_vorschlag || []).length > 0) {
+      nei.push({
+        id: praefix + "m", quell: "KI", feld: "Meilensteine", prioritaet: "mittel", aktiv: true,
+        text: "Vorschlag für deine Meilensteine (überprüfbare Ergebnisse, Daten bitte anpassen):\n" +
+          r.meilenstein_vorschlag.map((m) => `• ${m.datum}: ${m.ergebnis}`).join("\n"),
+      });
+    }
+    return nei;
+  };
+  const zeigKiEintrag = (eintrag) => {
+    if (!eintrag) return;
+    const r = eintrag.resultat || {};
+    setPlangCheckPunkte((l) => [...l.filter((k) => k.quell !== "KI"), ...kiPunkteVunResultat(r, String(eintrag.id))]);
+    setPlangKiLehrer(r.fuer_lehrer || null);
+    setPlangKiAktivId(eintrag.id);
+  };
 
   const oeffnePlangCheck = (p) => {
     const regelen = plangRegelCheck(p).map((k, i) => ({ ...k, id: "r" + i, quell: "Regel", aktiv: k.prioritaet !== "klein" }));
     setPlangCheckPunkte(regelen);
     setPlangKiFehler(null);
     setPlangKiLehrer(null);
+    setPlangKiHistorique([]);
+    setPlangKiAktivId(null);
     setPlangCheckModal({ schueler: p.Schüler, klasse: p.Klasse, titel: p.Titel });
+    // Gespäichert KI-Entwërf lueden (gratis, keen API-Opruff)
+    setPlangKiLaedt(true);
+    fetch(WEB_APP_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ typ: "plangKiFeedback", nurLaden: true, token: window.PPREN_SESSION?.token || "", schueler: p.Schüler, klasse: p.Klasse }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.ok) return;
+        const h = data.historique || [];
+        setPlangKiHistorique(h);
+        if (h.length > 0) zeigKiEintrag(h[0]);
+      })
+      .catch(() => {})
+      .finally(() => setPlangKiLaedt(false));
   };
   const schliesPlangCheck = () => {
     if (plangKiLaeuft || plangCheckSenden) return;
@@ -439,26 +489,9 @@ function App() {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
-      const r = data.resultat || {};
-      const nei = (r.kommentare || []).map((k, i) => ({
-        id: "k" + Date.now() + i, quell: "KI", feld: k.feld, prioritaet: k.prioritaet, text: k.text, aktiv: k.prioritaet !== "klein",
-      }));
-      if ((r.aufgaben_vorschlag || []).length > 0) {
-        nei.push({
-          id: "ka" + Date.now(), quell: "KI", feld: "Aufgaben", prioritaet: "wichtig", aktiv: true,
-          text: "Vorschlag für deine Aufgaben (jeweils Theorie und Praxis):\n" +
-            r.aufgaben_vorschlag.map((a) => `• ${a.schritt} – Theorie: ${a.theorie} | Praxis: ${a.praxis}`).join("\n"),
-        });
-      }
-      if ((r.meilenstein_vorschlag || []).length > 0) {
-        nei.push({
-          id: "km" + Date.now(), quell: "KI", feld: "Meilensteine", prioritaet: "mittel", aktiv: true,
-          text: "Vorschlag für deine Meilensteine (überprüfbare Ergebnisse, Daten bitte anpassen):\n" +
-            r.meilenstein_vorschlag.map((m) => `• ${m.datum}: ${m.ergebnis}`).join("\n"),
-        });
-      }
-      setPlangCheckPunkte((l) => [...l, ...nei]);
-      setPlangKiLehrer(r.fuer_lehrer || null);
+      const eintrag = data.eintrag || { id: "nei" + Date.now(), erstallt: "elo", vunProf: "", planStand: "", resultat: data.resultat || {} };
+      setPlangKiHistorique((h) => [eintrag, ...h]);
+      zeigKiEintrag(eintrag);
     } catch (e) {
       setPlangKiFehler(e.message);
     } finally {
@@ -499,6 +532,45 @@ function App() {
     }
   };
   const PRIO_LABEL = { wichtig: "🔴 wichteg", mittel: "🟠 mëttel", klein: "⚪ kleng" };
+
+  // PDF-Export iwwer de Backend: LaTeX mat dem selwechten Deckblat/Layout wéi de
+  // Projektplang-PDF. fuerProffen=false: just ugehaakte Punkten (Feedback-Blat fir
+  // de Schüler). fuerProffen=true: alles, mat Léierpersonal-Këscht an Entwécklung.
+  const [plangPdfLaeuft, setPlangPdfLaeuft] = useState(null);
+  const plangCheckPdf = async (fuerProffen) => {
+    if (!plangCheckModal) return;
+    setPlangPdfLaeuft(fuerProffen ? "proffen" : "schueler");
+    setPlangKiFehler(null);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          typ: "plangKiFeedback", token: window.PPREN_SESSION?.token || "",
+          schueler: plangCheckModal.schueler, klasse: plangCheckModal.klasse,
+          pdf: {
+            fuerProffen, aktivId: plangKiAktivId,
+            punkte: plangCheckPunkte.map((k) => ({ feld: k.feld, text: k.text, quell: k.quell, aktiv: k.aktiv })),
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      const bytes = Uint8Array.from(atob(data.pdfBase64), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = data.dateiname || "Feedback_Projektplan.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      setPlangKiFehler("PDF: " + e.message);
+    } finally {
+      setPlangPdfLaeuft(null);
+    }
+  };
 
   const ausgiFuer = (schueler) => ausgaben.filter((a) => a.Schüler === schueler).reduce((s, a) => s + (Number(a.Betrag) || 0), 0);
 
@@ -946,6 +1018,35 @@ function App() {
               Ugehaakte Punkte ginn als Kommentar un de Schüler; den Text kanns de virdrun änneren.
             </p>
             {plangKiFehler && <div className="check-fehler">{plangKiFehler}</div>}
+            {plangKiLaedt && <p className="check-meta">Gespäichert KI-Entwërf ginn gelueden…</p>}
+            {plangKiHistorique.length > 0 && (
+              <div className="pc-historique">
+                <label>
+                  KI-Entworf:{" "}
+                  <select value={plangKiAktivId || ""} onChange={(e) => zeigKiEintrag(plangKiHistorique.find((h) => String(h.id) === e.target.value))}>
+                    {plangKiHistorique.map((h, i) => (
+                      <option key={h.id} value={h.id}>
+                        {h.erstallt}{h.vunProf ? ` · ${h.vunProf}` : ""}{h.planStand ? ` · Plang-Stand ${h.planStand}` : ""}{i === 0 ? " (neiste)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {plangKiHistorique.length > 1 && (
+                  <table className="pc-entwecklung">
+                    <thead><tr><th>Entwécklung</th><th>Plang-Stand</th><th>Raster (KI-Aschätzung)</th></tr></thead>
+                    <tbody>
+                      {[...plangKiHistorique].reverse().map((h) => (
+                        <tr key={h.id} className={String(h.id) === String(plangKiAktivId) ? "pc-aktiv" : ""}>
+                          <td>{h.erstallt}</td>
+                          <td>{h.planStand || "–"}</td>
+                          <td>{h.resultat?.fuer_lehrer?.raster_schaetzung || "–"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
             {plangKiLehrer && (
               <div className="pc-lehrer">
                 <div className="pc-lehrer-titel">Nëmme fir d'Léierpersonal</div>
@@ -984,8 +1085,10 @@ function App() {
             )}
             <div className="modal-actions">
               <button type="button" className="btn-gen" onClick={schliesPlangCheck} disabled={plangKiLaeuft || plangCheckSenden}>Zoumaachen</button>
+              <button type="button" className="btn-gen" onClick={() => plangCheckPdf(false)} disabled={plangKiLaeuft || !!plangPdfLaeuft} title="Feedback-Blat (LaTeX, mat Deckblat) mat den ugehaakte Punkten, ouni Léierpersonal-Deel">{plangPdfLaeuft === "schueler" ? "PDF gëtt gemaach…" : "📄 PDF Schüler"}</button>
+              <button type="button" className="btn-gen" onClick={() => plangCheckPdf(true)} disabled={plangKiLaeuft || !!plangPdfLaeuft} title="Alles (LaTeX, mat Deckblat), mat Léierpersonal-Këscht an Entwécklung">{plangPdfLaeuft === "proffen" ? "PDF gëtt gemaach…" : "📄 PDF Proffen"}</button>
               <button type="button" className="btn-gen" onClick={plangKiStarten} disabled={plangKiLaeuft || plangCheckSenden}>
-                {plangKiLaeuft ? "KI schafft… (bis zu 1 Minutt)" : "🤖 KI-Entworf"}
+                {plangKiLaeuft ? "KI schafft… (bis zu 1 Minutt)" : plangKiHistorique.length > 0 ? "🤖 Nei préifen" : "🤖 KI-Entworf"}
               </button>
               <button
                 type="button"
@@ -1150,7 +1253,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .check-hiweis { font-size: 12.5px; color: #8a5a12; background: #fbe8c6; padding: 8px 12px; border-radius: 8px; margin: 0 0 10px; }
 .check-fehler { font-size: 12.5px; color: #8a2b1f; background: #fbe4e1; padding: 8px 12px; border-radius: 8px; margin: 0 0 10px; }
 .fb-meta { font-size: 11px; color: #6d7d74; white-space: nowrap; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
 .btn-gen-primary { color: #fff; background: #00A94F; border-color: #00A94F; }
 .btn-gen-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .pc-liste { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -1167,6 +1270,12 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .pc-lehrer { font-size: 12.5px; line-height: 1.5; color: #4a3a12; background: #fbf3e2; border: 1px solid #f0d29a; border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; }
 .pc-lehrer p { margin: 0 0 6px; }
 .pc-lehrer ul { margin: 4px 0 0; padding-left: 18px; }
+.pc-historique { font-size: 12.5px; color: #294f3c; background: #eef3ef; border-radius: 8px; padding: 8px 12px; margin: 0 0 10px; }
+.pc-historique select { font-size: 12.5px; font-family: inherit; border: 1px solid #c9d5cd; border-radius: 6px; padding: 3px 6px; background: #fff; max-width: 100%; }
+.pc-entwecklung { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+.pc-entwecklung th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #6d7d74; padding: 3px 6px; border-bottom: 1px solid #c9d5cd; }
+.pc-entwecklung td { padding: 4px 6px; border-bottom: 1px solid #dbe4de; vertical-align: top; }
+.pc-entwecklung tr.pc-aktiv td { font-weight: 700; }
 .pc-lehrer-titel { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #8a5a12; margin-bottom: 4px; }
 </style>
 </body>
