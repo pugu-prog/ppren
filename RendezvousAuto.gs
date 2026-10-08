@@ -4,7 +4,8 @@
  * Router-Zeil an PPREN.gs (doPost), nieft "rendezvousPlangen":
  *   } else if (data.typ === "rendezvousenPlangen") { return jsonResponse(rendezvousenPlangen(data));
  *
- * data = { token, erstalltVum, mailSchecken: true|false, mailText: "Hallo {virnumm}, … {terminer} …" (optional),
+ * data = { token, erstalltVum, mailSchecken: true|false,
+ *          mailText: "Hallo {virnumm}, … {terminer} … {ziler} … {meilensteng}" (optional),
  *          rendezvousen: [{ schueler, klasse, rvTyp, datum: "dd.MM.yyyy", zaeit: "HH:mm", dauer: 15, notiz }] }
  *
  * - schreift all Rendez-vousen an d'Tab "Rendezvousen" (Spalt K = Dauer an Minutten)
@@ -63,7 +64,11 @@ function rvMailSchecken_(info, terminer, mailText) {
   const betreff = "PPREN: " + (eent ? sortéiert[0].rvTyp + " geplangt fir de " + sortéiert[0].datum + (sortéiert[0].zaeit ? " um " + sortéiert[0].zaeit : "")
     : sortéiert.length + " Rendez-vousen geplangt");
   const text = mailText
-    ? String(mailText).replace(/\{virnumm\}/g, info.virnumm || "").replace(/\{terminer\}/g, zeilen.join("\n"))
+    ? String(mailText)
+        .replace(/\{virnumm\}/g, info.virnumm || "")
+        .replace(/\{terminer\}/g, zeilen.join("\n"))
+        .replace(/\{ziler\}/g, () => rvZiler_(info.matrikel))
+        .replace(/\{meilensteng\}/g, () => rvMeilensteng_(info.matrikel, rvIso_(sortéiert[0].datum)))
     : "Hallo " + (info.virnumm || "") + ",\n\n" +
     (eent ? "Fir dech ass e Rendez-vous geplangt:" : "Fir dech si Rendez-vousen geplangt:") + "\n\n" +
     zeilen.join("\n") + "\n\n" +
@@ -116,4 +121,56 @@ function rvIcs_(terminer) {
   });
   return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//PPREN//Rendezvousen//LB", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"]
     .concat(events, ["END:VCALENDAR"]).join("\r\n");
+}
+
+/** Ziler aus dem Projektplang vum Schüler (Übersicht, Spalt J „Projektplan-Details (JSON)“). */
+function rvZiler_(matrikel) {
+  const werte = SpreadsheetApp.openById(OVERVIEW_SHEET_ID).getSheets()[0].getDataRange().getValues();
+  for (let i = 1; i < werte.length; i++) {
+    if (werte[i][0] !== matrikel) continue;
+    let d = {};
+    try { d = JSON.parse(werte[i][9] || "{}"); } catch (e) { d = {}; }
+    const ziler = String(d.ziele || "").trim();
+    if (!ziler) return "  (an dengem Projektplang stinn nach keng Ziler – dat musst du nach nohuelen!)";
+    return ziler.split(/\n+/).map((z) => "  " + z.trim()).filter((z) => z.trim()).join("\n");
+  }
+  return "  (kee Projektplang fonnt)";
+}
+
+/**
+ * Eegen Meilesteng vum Schüler bis zum Termin: déi lescht ~6 Wochen + al déi nach net erreecht sinn,
+ * plus déi nächst 2 duerno. Offiziell Terminer a Vakanz ginn ausgeloos.
+ */
+function rvMeilensteng_(matrikel, terminIso) {
+  const sheet = getUebersichtSS().getSheetByName("Meilensteng");
+  if (!sheet) return "  (keng Meilesteng fonnt)";
+  const werte = sheet.getDataRange().getValues();
+  let liste = [];
+  for (let i = 1; i < werte.length; i++) {
+    if (werte[i][0] === matrikel) { try { liste = JSON.parse(werte[i][2] || "[]"); } catch (e) { liste = []; } break; }
+  }
+  liste = liste
+    .filter((m) => m && m.titel && m.datum && m.quell !== "Offiziell" && m.quell !== "Vakanz")
+    .map((m) => ({ titel: m.titel, iso: String(m.datum).slice(0, 10), erreecht: m.status === "Erreecht" }))
+    .sort((a, b) => a.iso.localeCompare(b.iso));
+  if (liste.length === 0) return "  (du hues nach keng eege Meilesteng – trag se an PPREN an!)";
+  const t = terminIso.split("-").map(Number);
+  const grenz = new Date(t[0], t[1] - 1, t[2] - 42);
+  const grenzIso = Utilities.formatDate(grenz, "Europe/Luxembourg", "yyyy-MM-dd");
+  const faelleg = liste.filter((m) => m.iso <= terminIso && (m.iso > grenzIso || !m.erreecht));
+  const duerno = liste.filter((m) => m.iso > terminIso).slice(0, 2);
+  const dmy = (iso) => iso.split("-").reverse().join(".");
+  const zeil = (m, k) => "  " + k + " " + dmy(m.iso) + " – " + m.titel;
+  const deel = [];
+  if (faelleg.length) {
+    deel.push("Bis zum Termin fälleg (weis, wat s du erreecht hues – a firwat eppes nach net fäerdeg ass):");
+    faelleg.forEach((m) => deel.push(zeil(m, m.erreecht ? "✔" : "☐")));
+  } else {
+    deel.push("Bis zum Termin ass keen eegene Meilesteen fälleg – iwwerpréif deng Planung!");
+  }
+  if (duerno.length) {
+    deel.push("Duerno geplangt (deng nächst Schrëtt):");
+    duerno.forEach((m) => deel.push(zeil(m, "→")));
+  }
+  return deel.join("\n");
 }

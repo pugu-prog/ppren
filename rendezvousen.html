@@ -126,7 +126,8 @@ const DAUER_OPTIOUNEN = { "Ziel-Iwwerpréiwung": [10, 12] };
 // Fachgespréich: 10 Min. Virbereedung virum Gespréich. De Schüler bereet sech vir, während de virege nach schwätzt,
 // dofir fänkt nëmmen dat éischt Gespréich vum Dag 10 Min. méi spéit un.
 const VIRBEREEDUNG = { "Fachgespréich": 10 };
-// Virschlag fir de Mail-Text. {virnumm} an {terminer} ginn pro Schüler ersat.
+// Virschlag fir de Mail-Text. {virnumm}, {terminer}, {ziler}, {meilensteng} ginn pro Schüler ersat (am Backend).
+// Virgab Ziel-Iwwerpréiwung = KRITAEREN aus zieluewerpreiwung.html, Fachgespréich = Instruktionen_Pruefer_Fachgespraeche_DE.docx
 const MAIL_VIRLAGEN = {
   "Ziel-Iwwerpréiwung":
 `Hallo {virnumm},
@@ -135,12 +136,20 @@ fir dech ass eng Ziel-Iwwerpréiwung geplangt:
 
 {terminer}
 
-D'Gespréich dauert 10–12 Minutten an et gëtt keng Virbereedungszäit virop — bereet dech also doheem vir. Mir schwätzen iwwer:
-  • däi Fortschrëtt zënter der leschter Etapp
-  • wéi eng vun dengen Ziler a Meilesteng du erreecht hues (a wéi eng net – firwat?)
-  • wat s du eegestänneg gemaach hues
-  • wéi s du mat Problemer ëmgaange bass
-  • deng nächst Schrëtt
+D'Gespréich dauert 10–12 Minutten an et gëtt keng Virbereedungszäit virop — bereet dech also doheem vir.
+
+VIRGAB – doropshi gëtt d'Gespréich bewäert (wéi an der Ziel-Iwwerpréiwung):
+  1. Fortschrëtt zënter der leschter Etapp
+  2. Erreechung vun de gesate Ziler
+  3. Autonomie / Eegenstännegkeet bei der Ëmsetzung
+  4. Ëmgang mat opgetruedene Problemer
+  5. Nächst Schrëtt sënnvoll geplangt
+
+DENG ZILER (aus dengem Projektplang):
+{ziler}
+
+DENG MEILESTENG:
+{meilensteng}
 
 Bréng mat: däi Projektplang, deng Dokumentatioun an deng Wochenberichter (Fotoen, Notizen, Skizzen – alles wat weist, wat s du gemaach hues).
 
@@ -157,10 +166,12 @@ fir dech ass e Fachgespréich geplangt:
 
 Wichteg: Komm 10 Minutte virun der Zäit hei uewen. Du kriss dann d'Froen an hues 10 Minutte Virbereedungszäit. Duerno schwätze mir 20 Minutte (ongeféier 4 Minutte pro Fro).
 
-Bereet dech vir:
-  • Kenns du d'Theorie hannert dengem Projet (Fachbegrëffer, Formelen, Zesummenhäng)?
-  • Kanns du erklären, wat s du gemaach hues a firwat?
-  • Bréng deng Dokumentatioun mat.
+Wat dech erwaart (Virgab fir d'Fachgespréicher):
+  • D'Froe betreffen den theoreteschen Deel vun dësem Trimester/Semester – och Saachen, déi s du nach net oder nëmmen hallef bearbecht hues.
+  • 5 Froen (oder 4 Froen, wann eng Zeechnung/Skizz derbäi ass), wéi bei enger Prüfung; Nofroe sinn erlaabt.
+  • Bewäert gëtt: fachlecht Verständnis, wéi gutt s du et erkläers, an de Bezuch zu dengem Projet.
+
+Bereet dech vir: Fachbegrëffer, Formelen a Zesummenhäng vun dengem Projet widderhuelen a sou erklären, dass een et versteet.
 
 Du fënns den Termin och an dengem Suivi: https://pugu-prog.github.io/ppren/suivi.html
 Am Unhang ass eng Kalennerdatei (.ics) – opmaachen, da kënnt den Termin mat Erënnerung an däin Handy-Kalenner. 2 Deeg virdrun kriss du nach eng Erënnerung per Mail.
@@ -468,7 +479,7 @@ function App() {
       {mailSchecken && (
         <details className="mail-editor">
           <summary>✉️ Mail-Text kucken / änneren</summary>
-          <p className="hint">{"{virnumm}"} an {"{terminer}"} ginn automatesch fir all Schüler ersat. Den Termin steet ausserdeem am Suivi vum Schüler (Iwwerbléck uewen + Kaart „📅 Termine mam Prof“).</p>
+          <p className="hint">{"{virnumm}"}, {"{terminer}"}, {"{ziler}"} (aus dem Projektplang) an {"{meilensteng}"} (déi eege Meilesteng bis zum Termin, mat ✔/☐, plus déi nächst 2) ginn automatesch fir all Schüler ersat. Den Termin steet ausserdeem am Suivi vum Schüler (Iwwerbléck uewen + Kaart „📅 Termine mam Prof“).</p>
           <textarea className="textarea mail-text" rows={16} value={mailText} onChange={(e) => setMailText(e.target.value)} />
           <button className="btn-link" onClick={() => setMailText(MAIL_VIRLAGEN[typ] || "")}>↺ Virschlag zerécksetzen</button>
         </details>
