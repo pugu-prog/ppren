@@ -4,7 +4,7 @@
  * Router-Zeil an PPREN.gs (doPost), nieft "rendezvousPlangen":
  *   } else if (data.typ === "rendezvousenPlangen") { return jsonResponse(rendezvousenPlangen(data));
  *
- * data = { token, erstalltVum, mailSchecken: true|false,
+ * data = { token, erstalltVum, mailSchecken: true|false, mailText: "Hallo {virnumm}, … {terminer} …" (optional),
  *          rendezvousen: [{ schueler, klasse, rvTyp, datum: "dd.MM.yyyy", zaeit: "HH:mm", dauer: 15, notiz }] }
  *
  * - schreift all Rendez-vousen an d'Tab "Rendezvousen" (Spalt K = Dauer an Minutten)
@@ -46,7 +46,7 @@ function rendezvousenPlangen(data) {
       const info = emailMap[matrikel];
       if (!info || !info.email) { ouniMail.push(matrikel); return; }
       try {
-        rvMailSchecken_(info, proSchueler[matrikel]);
+        rvMailSchecken_(info, proSchueler[matrikel], data.mailText);
         mailen++;
       } catch (e) { ouniMail.push(matrikel); }
     });
@@ -54,7 +54,7 @@ function rendezvousenPlangen(data) {
   return { ok: true, ids: liste.map((r) => r.id), mailen, ouniMail };
 }
 
-function rvMailSchecken_(info, terminer) {
+function rvMailSchecken_(info, terminer, mailText) {
   const sortéiert = terminer.slice().sort((a, b) => rvIso_(a.datum).localeCompare(rvIso_(b.datum)) || String(a.zaeit).localeCompare(String(b.zaeit)));
   const zeilen = sortéiert.map((r) => "  • " + r.rvTyp + ": " + rvDeeg_(r.datum) + " " + r.datum +
     (r.zaeit ? " um " + r.zaeit + (r.dauer ? " (" + r.dauer + " Min.)" : "") : "") +
@@ -62,7 +62,9 @@ function rvMailSchecken_(info, terminer) {
   const eent = sortéiert.length === 1;
   const betreff = "PPREN: " + (eent ? sortéiert[0].rvTyp + " geplangt fir de " + sortéiert[0].datum + (sortéiert[0].zaeit ? " um " + sortéiert[0].zaeit : "")
     : sortéiert.length + " Rendez-vousen geplangt");
-  const text = "Hallo " + (info.virnumm || "") + ",\n\n" +
+  const text = mailText
+    ? String(mailText).replace(/\{virnumm\}/g, info.virnumm || "").replace(/\{terminer\}/g, zeilen.join("\n"))
+    : "Hallo " + (info.virnumm || "") + ",\n\n" +
     (eent ? "Fir dech ass e Rendez-vous geplangt:" : "Fir dech si Rendez-vousen geplangt:") + "\n\n" +
     zeilen.join("\n") + "\n\n" +
     "Du fënns se och an dengem Suivi: https://pugu-prog.github.io/ppren/suivi.html\n" +

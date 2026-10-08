@@ -126,6 +126,48 @@ const DAUER_OPTIOUNEN = { "Ziel-Iwwerpréiwung": [10, 12] };
 // Fachgespréich: 10 Min. Virbereedung virum Gespréich. De Schüler bereet sech vir, während de virege nach schwätzt,
 // dofir fänkt nëmmen dat éischt Gespréich vum Dag 10 Min. méi spéit un.
 const VIRBEREEDUNG = { "Fachgespréich": 10 };
+// Virschlag fir de Mail-Text. {virnumm} an {terminer} ginn pro Schüler ersat.
+const MAIL_VIRLAGEN = {
+  "Ziel-Iwwerpréiwung":
+`Hallo {virnumm},
+
+fir dech ass eng Ziel-Iwwerpréiwung geplangt:
+
+{terminer}
+
+D'Gespréich dauert 10–12 Minutten an et gëtt keng Virbereedungszäit virop — bereet dech also doheem vir. Mir schwätzen iwwer:
+  • däi Fortschrëtt zënter der leschter Etapp
+  • wéi eng vun dengen Ziler a Meilesteng du erreecht hues (a wéi eng net – firwat?)
+  • wat s du eegestänneg gemaach hues
+  • wéi s du mat Problemer ëmgaange bass
+  • deng nächst Schrëtt
+
+Bréng mat: däi Projektplang, deng Dokumentatioun an deng Wochenberichter (Fotoen, Notizen, Skizzen – alles wat weist, wat s du gemaach hues).
+
+Du fënns den Termin och an dengem Suivi: https://pugu-prog.github.io/ppren/suivi.html
+Am Unhang ass eng Kalennerdatei (.ics) – opmaachen, da kënnt den Termin mat Erënnerung an däin Handy-Kalenner. 2 Deeg virdrun kriss du nach eng Erënnerung per Mail.
+
+Bis dann!`,
+  "Fachgespréich":
+`Hallo {virnumm},
+
+fir dech ass e Fachgespréich geplangt:
+
+{terminer}
+
+Wichteg: Komm 10 Minutte virun der Zäit hei uewen. Du kriss dann d'Froen an hues 10 Minutte Virbereedungszäit. Duerno schwätze mir 20 Minutte (ongeféier 4 Minutte pro Fro).
+
+Bereet dech vir:
+  • Kenns du d'Theorie hannert dengem Projet (Fachbegrëffer, Formelen, Zesummenhäng)?
+  • Kanns du erklären, wat s du gemaach hues a firwat?
+  • Bréng deng Dokumentatioun mat.
+
+Du fënns den Termin och an dengem Suivi: https://pugu-prog.github.io/ppren/suivi.html
+Am Unhang ass eng Kalennerdatei (.ics) – opmaachen, da kënnt den Termin mat Erënnerung an däin Handy-Kalenner. 2 Deeg virdrun kriss du nach eng Erënnerung per Mail.
+
+Vill Erfolleg!`,
+};
+
 function notizMatVirbereedung(typ, notiz) {
   const v = VIRBEREEDUNG[typ];
   const hiwais = v ? `Komm ${v} Min. virdrun: ${v} Min. Virbereedungszäit (d'Froe ginn ausgedeelt), duerno d'Gespréich zu der Zäit hei uewen.` : "";
@@ -173,8 +215,9 @@ function verdeelen({ schueler, startIso, dauer, puffer, besat, ausgeloos, minIso
     let t = minVun(slot.vun) + virlaf;
     const enn = minVun(slot.bis);
     while (i < schueler.length && t + dauer <= enn) {
-      const konflikt = bl.find(([a, b]) => t < b && t + dauer > a);
-      if (konflikt) { t = konflikt[1]; continue; }
+      // och tëscht bestoende Rendez-vousen de Wiessel respektéieren
+      const konflikt = bl.find(([a, b]) => t < b + puffer && t + dauer + puffer > a);
+      if (konflikt) { t = Math.max(t + 1, konflikt[1] + puffer); continue; }
       out.push({ ...schueler[i], iso, zaeit: zaeitVun(t), dauer });
       bl.push([t, t + dauer]);
       t += dauer + puffer;
@@ -184,7 +227,7 @@ function verdeelen({ schueler, startIso, dauer, puffer, besat, ausgeloos, minIso
   return { virschlag: out, netPlaz: schueler.slice(i) };
 }
 
-async function schecken(rendezvousen, mailSchecken) {
+async function schecken(rendezvousen, mailSchecken, mailText) {
   const res = await fetch(WEB_APP_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -193,6 +236,7 @@ async function schecken(rendezvousen, mailSchecken) {
       token: window.PPREN_SESSION?.token || "",
       erstalltVum: window.PPREN_SESSION?.numm || "",
       mailSchecken,
+      mailText,
       rendezvousen,
     }),
   });
@@ -234,6 +278,7 @@ function App() {
   const [dauer, setDauer] = useState(DAUER_STANDARD["Ziel-Iwwerpréiwung"]);
   const [notiz, setNotiz] = useState("");
   const [mailSchecken, setMailSchecken] = useState(true);
+  const [mailText, setMailText] = useState(MAIL_VIRLAGEN["Ziel-Iwwerpréiwung"]);
   const [rendezvousen, setRendezvousen] = useState([]);
   const [zaitplang, setZaitplang] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -245,7 +290,7 @@ function App() {
   const [klass, setKlass] = useState("");
   const [anker, setAnker] = useState("");
   const [startIso, setStartIso] = useState(heutegDatumIso());
-  const [puffer, setPuffer] = useState(0);
+  const [puffer, setPuffer] = useState(3);
   const [ausgeloos, setAusgeloos] = useState(new Set());
   const [ofgewielt, setOfgewielt] = useState(new Set());
   const [virschlag, setVirschlag] = useState(null);
@@ -267,7 +312,7 @@ function App() {
   };
   useEffect(() => { lade(); }, []);
   useEffect(() => { if (!klass && KLASSEN.length) setKlass(KLASSEN[0]); }, [KLASSEN]);
-  useEffect(() => { setDauer(DAUER_STANDARD[typ] || 20); }, [typ]);
+  useEffect(() => { setDauer(DAUER_STANDARD[typ] || 20); setMailText(MAIL_VIRLAGEN[typ] || ""); }, [typ]);
 
   const sortéiert = useMemo(
     () => [...rendezvousen].sort((a, b) => (dmyZuIso(a.Datum) + (a.Zäit || "")).localeCompare(dmyZuIso(b.Datum) + (b.Zäit || ""))),
@@ -334,7 +379,7 @@ function App() {
     try {
       const d = await schecken(virschlag.map((v) => ({
         schueler: v.name, klasse: v.klasse, rvTyp: typ, datum: isoZuDmy(v.iso), zaeit: v.zaeit, dauer: Number(v.dauer) || Number(dauer), notiz: notizMatVirbereedung(typ, notiz),
-      })), mailSchecken);
+      })), mailSchecken, mailText);
       setToast(`${virschlag.length} Rendez-vous(en) geplangt` + mailInfo(d, mailSchecken));
       setVirschlag(null);
       setNotiz("");
@@ -351,7 +396,7 @@ function App() {
   const canSubmit = schuelerId && datum;
   const eenzelAnker = useMemo(() => (currentSchueler ? ankerFir(currentSchueler.klasse, null).slice(0, 6) : []), [zaitplang, currentSchueler]);
   const nächstSlot = () => {
-    const r = verdeelen({ schueler: [{}], startIso: datum, dauer: Number(dauer) || 10, puffer: 0, besat, ausgeloos: new Set(), minIso: datum < heidegIso ? heidegIso : datum, virlaf: VIRBEREEDUNG[typ] || 0 });
+    const r = verdeelen({ schueler: [{}], startIso: datum, dauer: Number(dauer) || 10, puffer: Number(puffer) || 0, besat, ausgeloos: new Set(), minIso: datum < heidegIso ? heidegIso : datum, virlaf: VIRBEREEDUNG[typ] || 0 });
     if (r.virschlag[0]) { setDatum(r.virschlag[0].iso); setZaeit(r.virschlag[0].zaeit); }
   };
 
@@ -362,7 +407,7 @@ function App() {
     try {
       const d = await schecken([{
         schueler: currentSchueler.name, klasse: currentSchueler.klasse, rvTyp: typ, datum: isoZuDmy(datum), zaeit, dauer: zaeit ? Number(dauer) : "", notiz: notizMatVirbereedung(typ, notiz),
-      }], mailSchecken);
+      }], mailSchecken, mailText);
       setToast("Rendez-vous geplangt" + mailInfo(d, mailSchecken));
       setNotiz("");
       lade();
@@ -415,10 +460,20 @@ function App() {
   })();
 
   const mailCheckbox = (
-    <label className="check">
-      <input type="checkbox" checked={mailSchecken} onChange={(e) => setMailSchecken(e.target.checked)} />
-      📧 Schüler direkt per Mail informéieren (mat Kalennerdatei .ics) — 2 Deeg virdrun kënnt nach eng Erënnerung
-    </label>
+    <>
+      <label className="check">
+        <input type="checkbox" checked={mailSchecken} onChange={(e) => setMailSchecken(e.target.checked)} />
+        📧 Schüler direkt per Mail informéieren (mat Kalennerdatei .ics) — 2 Deeg virdrun kënnt nach eng Erënnerung
+      </label>
+      {mailSchecken && (
+        <details className="mail-editor">
+          <summary>✉️ Mail-Text kucken / änneren</summary>
+          <p className="hint">{"{virnumm}"} an {"{terminer}"} ginn automatesch fir all Schüler ersat. Den Termin steet ausserdeem am Suivi vum Schüler (Iwwerbléck uewen + Kaart „📅 Termine mam Prof“).</p>
+          <textarea className="textarea mail-text" rows={16} value={mailText} onChange={(e) => setMailText(e.target.value)} />
+          <button className="btn-link" onClick={() => setMailText(MAIL_VIRLAGEN[typ] || "")}>↺ Virschlag zerécksetzen</button>
+        </details>
+      )}
+    </>
   );
 
   return (
@@ -441,7 +496,7 @@ function App() {
             <h2>Ganz Klass automatesch plangen</h2>
             <p className="hint">
               ⏰ Fräi Zäit: <b>Méindes 13:10–15:50</b> ({kapazitéit.me} Plazen) an <b>Dënschdes 13:10–14:50</b> ({kapazitéit.de} Plazen) bei {dauer} Min.
-              {Number(puffer) ? ` + ${puffer} Min. Paus` : ""}.
+              {Number(puffer) ? ` + ${puffer} Min. Wiessel` : ""}.
               {VIRBEREEDUNG[typ] ? ` Fachgespréich: ${VIRBEREEDUNG[typ]} Min. Virbereedung virdrun (déi éischt um 13:10, d'Gespréich ab 13:${10 + VIRBEREEDUNG[typ]}) — den Hiwäis kënnt automatesch an d'Mail.` : ""} Besat Zäiten (aner Rendez-vousen) ginn iwwersprongen.
             </p>
             <div className="grid3">
@@ -463,7 +518,7 @@ function App() {
                   <input type="number" min="5" step="1" className="input" value={dauer} onChange={(e) => setDauer(e.target.value)} />
                 </label>
                 <label className="field">
-                  <span className="field-label">Paus (Min.)</span>
+                  <span className="field-label">Wiessel (Min.)</span>
                   <input type="number" min="0" step="5" className="input" value={puffer} onChange={(e) => setPuffer(e.target.value)} />
                 </label>
                 {(DAUER_OPTIOUNEN[typ] || []).length > 0 && (
@@ -721,6 +776,9 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .col-zaeit { width: 110px; }
 .input-kleng { padding: 4px 6px; font-size: 12.5px; width: auto; }
 .dauer-knaepp { display: flex; gap: 6px; margin: -10px 0 8px; grid-column: 1 / -1; }
+.mail-editor { margin: 0 0 14px; }
+.mail-editor summary { font-size: 12.5px; font-weight: 700; color: #294f3c; cursor: pointer; margin-bottom: 8px; }
+.mail-text { font-size: 12.5px; line-height: 1.45; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: #294f3c; margin: 4px 0 14px; cursor: pointer; }
 @media (max-width: 640px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
 </style>
