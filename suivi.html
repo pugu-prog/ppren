@@ -30,6 +30,242 @@ const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxg
 const PERIODEN_2GSE = ["Trimester 1", "Trimester 2", "Trimester 3"];
 const PERIODEN_1GSE = ["Semester 1", "Semester 2"];
 
+// Bewäertungsraster (selwecht Quell wéi bewertung.html): de Schüler gesäit fir all
+// Period, wat bewäert gëtt — och ier eng Bewäertung finaliséiert ass (dann ouni Punkten/Kommentaren).
+/* Fallback-Struktur (wird nur benotzt, wann d'Backend-Bewertungsraster
+   nach net gesied ass oder net erreichbar ass). D'Standard-Quell ass elo
+   d'Bewertungsraster-Sheet iwwer den Backend — kuck bauStrukturVunRaster(). */
+const STRUKTUR_2GSE_FALLBACK = {
+  "Trimester 1": {
+    offizielleSkala: 270,
+    wochenberichte: { max: 60, label: "Wochenberichte (12 × 5P)" },
+    gruppen: [
+      {
+        titel: "Planung / Themenfindung", typ: "planung",
+        items: [{ name: "Projektplan", max: 30, indikatoren: "Beschreibung des Projektes (15P); Motivation/Bezug zu Umweltwissenschaften (3P); Ziele (6P); Aufgabenteilung bei Gruppenarbeit (6P); Kostenplan falls erforderlich" }],
+      },
+      {
+        titel: "Umsetzung des Projektes und Dokumentation", typ: "umsetzung",
+        items: [
+          { name: "Bewältigung des Themas", max: 30, indikatoren: "Arbeit an vereinbarten Zielsetzungen; Zielüberprüfung an 2 Terminen (je 11P); Autonomie (8P)" },
+          { name: "Dokumentation", max: 30, indikatoren: "Einleitung, Vorwort, Titelseite, Inhaltsverzeichnis, Verzeichnisse; Recherche/Theorie (20P)" },
+        ],
+      },
+      {
+        titel: "Methodologie 1 — Bewerbungsmappe & Praktikumssuche", typ: "methodologie",
+        items: [
+          { name: "Bewerbungsmappe (FR/DE/EN)", max: 30, indikatoren: "Alle Dokumente vorhanden; Richtlinien für Bewerbungsschreiben/Lebenslauf beachtet" },
+          { name: "Überprüfung der erledigten Arbeiten", max: 10, indikatoren: "Methodische, gezielte Kontrolle; Nutzung von Korrekturressourcen; Fehler erkannt und korrigiert" },
+          { name: "Praktikumsplatzsuche", max: 20, indikatoren: "Alle Suchmöglichkeiten ausgeschöpft; Termine eingehalten" },
+        ],
+      },
+      {
+        titel: "Methodologie 2 — Kommunikation & Recherche", typ: "methodologie",
+        items: [
+          { name: "Schriftliche Kommunikation per E-Mail", max: 40, indikatoren: "Standardsätze/Höflichkeitsformeln bekannt; passender Wortschatz; korrekte Struktur" },
+          { name: "Elektronische Kommunikationsmittel", max: 10, indikatoren: "Modalitäten bekannt und korrekt angewendet; Anweisungen korrekt umgesetzt" },
+          { name: "Effiziente Nutzung verschiedener Quellen", max: 10, indikatoren: "Informationsquellen unterschieden und projektrelevant ausgewählt" },
+        ],
+      },
+    ],
+  },
+  "Trimester 2": {
+    offizielleSkala: 190,
+    wochenberichte: { max: 40, label: "Meilensteine / Wochenberichte (8 × 5P)" },
+    gruppen: [
+      {
+        titel: "Umsetzung des Projektes und Dokumentation", typ: "umsetzung",
+        items: [
+          { name: "Bewältigung des Themas", max: 30, indikatoren: "Arbeit an Zielsetzungen; 1–2 Prüftermine; Autonomie" },
+          { name: "Dokumentation", max: 30, indikatoren: "Theoretische Grundlagen (25P); Quellenverzeichnis (5P)" },
+        ],
+      },
+      {
+        titel: "Fachgespräch", typ: "fachgespraech",
+        items: [{ name: "Fachwissen", max: 30, indikatoren: "4 Fragen mit Skizze oder 5 Fragen kompetent & fachlich korrekt beantwortet, Fachbegriffe benutzt" }],
+      },
+      {
+        titel: "Schriftliche Prüfung", typ: "dokumentation",
+        items: [{ name: "Schriftliche Prüfung", max: 30, indikatoren: "Vorbereitung auf das schriftliche Examen; Analyse und Reflexion des Projekts" }],
+      },
+      {
+        titel: "Methodologie", typ: "methodologie",
+        items: [
+          { name: "Digitale Kompetenzen", max: 15, indikatoren: "Beherrschung fortgeschrittener Funktionen der verwendeten Software (MS Office)" },
+          { name: "Recherche, Analyse und Dokumentation", max: 15, indikatoren: "Theoretische Grundlagen & Quellenverzeichnis; Vielfalt & Relevanz der Quellen" },
+        ],
+      },
+    ],
+  },
+  "Trimester 3": {
+    offizielleSkala: 300,
+    wochenberichte: { max: 60, label: "Meilensteine / Wochenberichte (8–12 × 5P)" },
+    gruppen: [
+      {
+        titel: "Vorgehensweise bei der Umsetzung des Projektes", typ: "umsetzung",
+        items: [
+          { name: "Bewältigung des Themas", max: 30, indikatoren: "Arbeit an Zielsetzungen; 1–2 Prüftermine; Autonomie (8P)" },
+          { name: "Sachliche Qualität", max: 60, indikatoren: "Komponenten/Produkt funktionieren wie geplant (30P); Qualität inkl. Film überzeugt (30P)" },
+        ],
+      },
+      {
+        titel: "Schriftliche Arbeit / Dokumentation", typ: "dokumentation",
+        items: [
+          { name: "Darstellung", max: 8, indikatoren: "Übersichtlich strukturiert & gegliedert; sorgfältiges, kompaktes Layout" },
+          { name: "Sprache", max: 7, indikatoren: "Verständlich, flüssig, prägnant; korrekte Grammatik/Satzbau/Rechtschreibung/Zeichensetzung" },
+          { name: "Zitate, Quellen, Verzeichnisse", max: 5, indikatoren: "Vollständige Quellenangaben & Verzeichnisse" },
+          { name: "Sachliche Qualität", max: 40, indikatoren: "Vollständig, fachlich begründet und korrekt" },
+        ],
+      },
+      {
+        titel: "Präsentation", typ: "praesentation",
+        items: [
+          { name: "Struktur", max: 6, indikatoren: "Durchdacht und ansprechend gestaltet" },
+          { name: "Inhalt", max: 12, indikatoren: "Repräsentativ, mit Einblick in Ergebnisse und Produkt" },
+          { name: "Sprache", max: 3, indikatoren: "Flüssig, verständlich, korrekt" },
+          { name: "Interaktion", max: 3, indikatoren: "Interesse geweckt, Publikum angemessen einbezogen" },
+          { name: "Fragen", max: 6, indikatoren: "Kompetent beantwortet" },
+        ],
+      },
+      {
+        titel: "Fachgespräch", typ: "fachgespraech",
+        items: [
+          { name: "Fachwissen", max: 20, indikatoren: "4/5 Fragen kompetent beantwortet, Fachbegriffe benutzt" },
+          { name: "Eigenbewertung / Reflexion", max: 10, indikatoren: "Analyse und Reflexion des Projekts" },
+        ],
+      },
+      {
+        titel: "Methodologie", typ: "methodologie",
+        items: [
+          { name: "Vorbereitung und Verwaltung des Projekts", max: 20, indikatoren: "Checkliste vor Abgabe genutzt; Zwischentermine eingehalten" },
+          { name: "Teamarbeit (PowerPoint-Präsentation)", max: 10, indikatoren: "Organisation der Notizen; individuelle Beiträge; Koordination/Kommunikation" },
+        ],
+      },
+    ],
+  },
+};
+
+const STRUKTUR_1GSE_FALLBACK = {
+  "Semester 1": {
+    offizielleSkala: 210,
+    wochenberichte: { max: 60, label: "Wochenberichte (12 × 5P)" },
+    gruppen: [
+      {
+        titel: "Planung / Themenfindung", typ: "planung",
+        items: [{ name: "Projektplan", max: 30, indikatoren: "Beschreibung des Projektes (15P); Motivation/Bezug zu Umweltwissenschaften (3P); Ziele (6P); Meilensteine bis Ende 1. Semester; Aufgabenteilung bei Gruppenarbeit (6P); Kostenplan falls erforderlich" }],
+      },
+      {
+        titel: "Methodologie", typ: "methodologie",
+        items: [
+          { name: "Reflexion", max: 15, indikatoren: "Zeitplanung; Kostenplanung; Eigene Entwicklung (Initiative, Autonomie, Gelerntes); Qualität des Projektergebnisses; Teamwork" },
+          { name: "Zusammenfassen", max: 15, indikatoren: "Bedeutung des Themas; Stand der Wissenschaft/Technik; Fragestellung; Methodisches Vorgehen; wichtigste Resultate/Erkenntnisse/Argumente" },
+          { name: "Zitieren", max: 15, indikatoren: "Zitate und Quellenangabe nach APA (Bücher, Artikel, PDF-Dokumente, Internetseiten, Video)" },
+          { name: "Überprüfung der erledigten Arbeiten", max: 15, indikatoren: "Methodische, gezielte Kontrolle; Nutzung von Korrekturressourcen; Fehler erkannt und korrigiert" },
+        ],
+      },
+      {
+        titel: "Umsetzung des Projektes und Dokumentation", typ: "umsetzung",
+        items: [
+          { name: "Bewältigung des Themas", max: 30, indikatoren: "Arbeit an vereinbarten Zielsetzungen; Zielüberprüfung an 2 Terminen (je 11P); Autonomie (8P)" },
+          { name: "Dokumentation", max: 30, indikatoren: "Einleitung, Vorwort, Titelseite, Inhaltsverzeichnis, Verzeichnisse; Recherche/Theorie (20P)" },
+        ],
+      },
+    ],
+  },
+  "Semester 2": {
+    offizielleSkala: 330,
+    wochenberichte: { max: 60, label: "Meilensteine / Wochenberichte (12 × 5P)" },
+    gruppen: [
+      {
+        titel: "Fachgespräch", typ: "fachgespraech",
+        items: [{ name: "Fachwissen", max: 30, indikatoren: "4 Fragen mit Skizze oder 5 Fragen kompetent & fachlich korrekt beantwortet, Fachbegriffe benutzt" }],
+      },
+      {
+        titel: "Schriftliche Prüfung", typ: "dokumentation",
+        items: [{ name: "Schriftliche Prüfung", max: 30, indikatoren: "Vorbereitung auf das schriftliche Examen; Analyse und Reflexion des Projekts" }],
+      },
+      {
+        titel: "Vorgehensweise bei der Umsetzung des Projektes", typ: "umsetzung",
+        items: [
+          { name: "Bewältigung des Themas", max: 30, indikatoren: "Zielsetzungen (10P); 1–2 Prüftermine (2×6P); Autonomie (8P)" },
+          { name: "Sachliche Qualität", max: 60, indikatoren: "Komponenten/Produkt funktionieren wie geplant (30P); Qualität inkl. Film überzeugt (30P)" },
+        ],
+      },
+      {
+        titel: "Schriftliche Arbeit / Dokumentation", typ: "dokumentation",
+        items: [
+          { name: "Darstellung", max: 8, indikatoren: "Übersichtlich strukturiert & gegliedert; sorgfältiges, kompaktes Layout" },
+          { name: "Sprache", max: 7, indikatoren: "Verständlich, flüssig, prägnant; korrekte Grammatik/Satzbau/Rechtschreibung/Zeichensetzung" },
+          { name: "Zitate, Quellen, Verzeichnisse", max: 5, indikatoren: "Vollständige Quellenangaben & Verzeichnisse" },
+          { name: "Sachliche Qualität", max: 40, indikatoren: "Vollständig, fachlich begründet und korrekt" },
+        ],
+      },
+      {
+        titel: "Präsentation", typ: "praesentation",
+        items: [
+          { name: "Struktur", max: 6, indikatoren: "Durchdacht und ansprechend gestaltet" },
+          { name: "Inhalt", max: 12, indikatoren: "Repräsentativ, mit Einblick in Ergebnisse und Produkt" },
+          { name: "Sprache", max: 3, indikatoren: "Flüssig, verständlich, korrekt" },
+          { name: "Interaktion", max: 3, indikatoren: "Interesse geweckt, Publikum angemessen einbezogen" },
+          { name: "Fragen", max: 6, indikatoren: "Kompetent beantwortet" },
+        ],
+      },
+      {
+        titel: "Methodologie", typ: "methodologie",
+        items: [
+          { name: "Umfragen, Interview", max: 15, indikatoren: "Planung, Durchführung und Auswertung" },
+          { name: "Film", max: 15, indikatoren: "Erstellen eines Storyboards (Drehbuch)" },
+        ],
+      },
+    ],
+  },
+};
+
+/* M6: Baut aus den rohen Bewertungsraster-Zeilen vum Backend d'selwecht
+   Struktur wéi STRUKTUR_2GSE_FALLBACK/STRUKTUR_1GSE_FALLBACK. Gëtt null
+   zréck, wann d'Backend-Raster (nach) eidel ass — dann gëtt de Fallback
+   benotzt. */
+function bauStrukturVunRaster(raster) {
+  if (!raster || raster.length === 0) return null;
+  const perKlasse = {};
+  raster.forEach((r) => {
+    const klasse = r.Klasse;
+    const periode = r.Periode;
+    if (!klasse || !periode) return;
+    if (!perKlasse[klasse]) perKlasse[klasse] = {};
+    if (!perKlasse[klasse][periode]) {
+      perKlasse[klasse][periode] = {
+        offizielleSkala: Number(r.OffizielleSkala) || 0,
+        wochenberichte: { max: Number(r.WochenberichteMax) || 0, label: r.WochenberichteLabel || "" },
+        gruppenMap: {},
+      };
+    }
+    const per = perKlasse[klasse][periode];
+    const gKey = r.GruppeOrder + "|" + r.GruppeTitel;
+    if (!per.gruppenMap[gKey]) {
+      per.gruppenMap[gKey] = { order: Number(r.GruppeOrder) || 0, titel: r.GruppeTitel, typ: r.GruppeTyp, items: [] };
+    }
+    per.gruppenMap[gKey].items.push({
+      order: Number(r.ItemOrder) || 0, name: r.ItemName, max: Number(r.ItemMax) || 0, indikatoren: r.ItemIndikatoren || "",
+    });
+  });
+  const resultat = {};
+  Object.keys(perKlasse).forEach((klasse) => {
+    resultat[klasse] = {};
+    Object.keys(perKlasse[klasse]).forEach((periode) => {
+      const per = perKlasse[klasse][periode];
+      const gruppen = Object.values(per.gruppenMap)
+        .sort((a, b) => a.order - b.order)
+        .map((g) => ({
+          titel: g.titel, typ: g.typ,
+          items: [...g.items].sort((a, b) => a.order - b.order).map(({ order, ...rest }) => rest),
+        }));
+      resultat[klasse][periode] = { offizielleSkala: per.offizielleSkala, wochenberichte: per.wochenberichte, gruppen };
+    });
+  });
+  return resultat;
+}
+
 // Déiselwecht Faarfpalett wéi am Planungstool/Gantt-Chart, fir konsequent Faarwen
 // iwwerall wou Meilensteng-Kategorien ugewisen ginn.
 const KATEGORIE_FARWEN = { "Event": "#f0ec3a", "Iwwerpréiwung": "#d9d3f5", "Praktesch Phase": "#1ecdc4", "Ofgab": "#a9d92d", "Eegen": "#F67E1B", "Projektplang": "#5b9bd5" };
@@ -115,6 +351,7 @@ function App() {
   const [geladen, setGeladen] = useState(false);
   const [suiviPdfGenerating, setSuiviPdfGenerating] = useState(false);
   const [wbOffenId, setWbOffenId] = useState(null);
+  const [rasterVunBackend, setRasterVunBackend] = useState(null);
 
   const currentSchueler = SCHUELER.find((s) => s.id === schuelerId);
   const istGSE2 = currentSchueler?.klasse === "2GSE";
@@ -132,6 +369,7 @@ function App() {
         const meins = alleProjekte.find((p) => p.Schüler === currentSchueler.name);
         setProjekt(meins || null);
         setBewertungen((data.bewertungen || []).filter((b) => b.Schüler === currentSchueler.name));
+        setRasterVunBackend(bauStrukturVunRaster(data.bewertungsraster));
         setWochenberichte((data.wochenberichte || []).filter((w) => w.Schüler === currentSchueler.name));
         setFachgespraeche((data.fachgespraeche || []).filter((f) => f.Schüler === currentSchueler.name));
         setZieluewerpreiwungen((data.zieluewerpreiwungen || []).filter((z) => z.Schüler === currentSchueler.name));
@@ -704,8 +942,44 @@ function App() {
                   {!b && <p className="notice">
                     {!istSchueler && entworfFuer(periode)
                       ? "📝 Entworf existéiert (nach net validéiert) — de Schüler gesäit dëst nach net. Fäerdeg maachen a validéieren am Bewertungs-Tool."
-                      : "Fir dës Period läit nach keng Bewertung vir."}
+                      : "Fir dës Period läit nach keng Bewertung vir. Hei gesäis de, wat bewäert gëtt."}
                   </p>}
+
+                  {!b && (() => {
+                    const struktur = (istGSE2
+                      ? (rasterVunBackend?.["2GSE"] || STRUKTUR_2GSE_FALLBACK)
+                      : (rasterVunBackend?.["1GSE"] || STRUKTUR_1GSE_FALLBACK))[periode];
+                    if (!struktur) return null;
+                    const gruppen = [...(struktur.gruppen || [])];
+                    if (struktur.wochenberichte && struktur.wochenberichte.max > 0) {
+                      gruppen.unshift({ titel: "Wochenberichte", items: [{ name: struktur.wochenberichte.label || "Wochenberichte", max: struktur.wochenberichte.max, indikatoren: "Zusammenfassung 2P; Bewertung des Fortschritts 1,5P; Anhänge 1P; Grammatik 0,5P (pro Bericht)" }] });
+                    }
+                    const total = gruppen.reduce((s, g) => s + (g.items || []).reduce((t, i) => t + (Number(i.max) || 0), 0), 0);
+                    return (
+                      <div className="raster-leer">
+                        <p className="punkte-summe">Gesamt: – / {struktur.offizielleSkala || total} Punkte</p>
+                        {gruppen.map((g) => {
+                          const gMax = (g.items || []).reduce((t, i) => t + (Number(i.max) || 0), 0);
+                          return (
+                            <div className="gruppe-block" key={g.titel}>
+                              <div className="gruppe-head">
+                                <span className="gruppe-name">{g.titel}</span>
+                                <span className="gruppe-punkte">– / {gMax}</span>
+                              </div>
+                              <ul className="positionen-liste">
+                                {(g.items || []).map((i, idx) => (
+                                  <li key={idx}>
+                                    {i.name}: <strong>– / {i.max}</strong>
+                                    {i.indikatoren && <span className="raster-indikatoren">{i.indikatoren}</span>}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
 
                   {b && (
                     <>
@@ -806,6 +1080,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .btn-primary { background: #00A94F; color: #fff; margin-top: 14px; }
 .btn-ghost { background: #eef3ef; color: #00A94F; }
 .btn-ghost:disabled { opacity: 0.6; cursor: wait; }
+.raster-leer { margin-top: 14px; }
+.raster-indikatoren { display: block; font-size: 11.5px; color: #6d7d74; margin-top: 2px; }
 .notice { background: #fbe8c6; color: #8a5a12; font-size: 13px; padding: 12px 14px; border-radius: 8px; line-height: 1.5; margin: 0; }
 .empty { padding: 30px; text-align: center; color: #6d7d74; font-size: 14px; background: #fff; border-radius: 12px; border: 1px solid #e2e8e3; }
 .error { color: #8a2b1f; }
