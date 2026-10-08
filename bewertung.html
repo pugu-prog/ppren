@@ -407,6 +407,7 @@ function App() {
   const [wbAuto, setWbAuto] = useState({ summe: 0, max: 0, anzahl: 0 });
   const [fgInfo, setFgInfo] = useState(null);
   const [zpInfo, setZpInfo] = useState(null);
+  const [kiPlangInfo, setKiPlangInfo] = useState(null);
   const [kommentar, setKommentar] = useState("");
   const [allgemeinAuswahl, setAllgemeinAuswahl] = useState({});
   const [syncing, setSyncing] = useState(false);
@@ -438,6 +439,7 @@ function App() {
     setEntworfGespäichert(false);
     setFgInfo(null);
     setZpInfo(null);
+    setKiPlangInfo(null);
   };
 
   const periodeWaehlen = async (p) => {
@@ -449,6 +451,7 @@ function App() {
     setWbAuto({ summe: 0, max: 0, anzahl: 0 });
     setFgInfo(null);
     setZpInfo(null);
+    setKiPlangInfo(null);
     setDocUrl(null);
     setAllgemeinAuswahl({});
     setKommentar("");
@@ -507,6 +510,32 @@ function App() {
         setFgInfo({ datum: fgLetzt.Datum, variante: fgLetzt.Variante });
       } else {
         setFgInfo(null);
+      }
+
+      // KI-Virschlag fir de Projektplang (aus dem Plang-Check am Dashboard) — gëtt
+      // NET automatesch agedroen, de Prof iwwerhëlt en bewosst per Knäppchen.
+      if ((s[p]?.gruppen || []).some((g) => (g.items || []).some((i) => i.name === "Projektplan"))) {
+        try {
+          const kiRes = await fetch(WEB_APP_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ typ: "plangKiFeedback", nurLaden: true, token: window.PPREN_SESSION?.token || "", schueler: schuelerName }),
+          });
+          const kiData = await kiRes.json();
+          const lescht = kiData.ok && (kiData.historique || [])[0];
+          if (lescht) {
+            const fl = lescht.resultat?.fuer_lehrer || {};
+            let gesamt = null;
+            if (fl.raster_punkte) {
+              const rp = fl.raster_punkte;
+              gesamt = (Number(rp.beschreibung) || 0) + (Number(rp.motivation) || 0) + (Number(rp.ziele) || 0) + (Number(rp.aufgaben) || 0);
+            } else if (fl.raster_schaetzung) {
+              const treffer = [...String(fl.raster_schaetzung).matchAll(/(\d+(?:[.,]\d+)?)\s*\/\s*(\d+)/g)].slice(0, 4);
+              if (treffer.length > 0) gesamt = treffer.reduce((sum, m) => sum + parseFloat(m[1].replace(",", ".")), 0);
+            }
+            setKiPlangInfo({ gesamt, detail: fl.raster_schaetzung || "", datum: lescht.erstallt, planStand: lescht.planStand });
+          }
+        } catch (e) { /* KI-Virschlag ass optional */ }
       }
 
       const zpTreffer = (data.zieluewerpreiwungen || []).filter((z) => z.Schüler === schuelerName && z.Periode === p);
@@ -766,6 +795,28 @@ function App() {
                     <p className="notice">ℹ️ Nach keng Ziel-Iwwerpréiwung fir dës Period gespäichert — manuell aginn oder éischt am Ziler-iwwerpréiwen-Tool ausfëlen.</p>
                   )}
 
+                  {(gruppiert[g.titel] || []).some((k) => k.name === "Projektplan") && (
+                    kiPlangInfo ? (
+                      <div className="notice notice-ki">
+                        🤖 <b>KI-Virschlag Projektplang{kiPlangInfo.gesamt != null ? `: ${kiPlangInfo.gesamt} / 30` : ""}</b>
+                        {" "}(Entworf vum {kiPlangInfo.datum}{kiPlangInfo.planStand ? `, Plang-Stand ${kiPlangInfo.planStand}` : ""})
+                        {kiPlangInfo.detail && <div className="ki-detail">{kiPlangInfo.detail}</div>}
+                        <div className="ki-aktiounen">
+                          {kiPlangInfo.gesamt != null && (
+                            <button
+                              type="button" className="btn-gen"
+                              onClick={() => setKategorien((ks) => ks.map((k) => (k.name === "Projektplan" ? { ...k, punkte: String(Math.min(k.max, Math.round(kiPlangInfo.gesamt * 2) / 2)) } : k)))}
+                            >↓ {kiPlangInfo.gesamt} P iwwerhuelen</button>
+                          )}
+                          <a className="btn-gen" href="dashboard.html" target="_blank">🧪 Plang-Check →</a>
+                        </div>
+                        <div className="ki-hiweis">Just e Virschlag — d'Note decidéiers du.</div>
+                      </div>
+                    ) : (
+                      <p className="notice">ℹ️ Nach kee KI-Entworf fir dëse Projektplang — am Dashboard iwwer „🧪 Plang-Check → 🤖 KI-Entworf“ maachen (optional).</p>
+                    )
+                  )}
+
                   {(gruppiert[g.titel] || []).map((k) => (
                     <div className="item-block" key={k.id}>
                       <div className="kat-row">
@@ -923,8 +974,12 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .brand-mark { font-weight: 800; font-size: 15px; letter-spacing: 0.06em; }
 .brand-sub { font-size: 13px; opacity: 0.85; }
 .content { max-width: 720px; margin: 0 auto; padding: 24px 20px 60px; }
+.ki-detail { font-size: 12px; color: #6b5420; margin-top: 4px; }
+.ki-aktiounen { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.ki-hiweis { font-size: 11px; color: #8a7a55; margin-top: 6px; }
 .notice { background: #fbe8c6; color: #8a5a12; font-size: 12px; padding: 10px 14px; border-radius: 8px; margin: 10px 0 0; line-height: 1.45; }
 .notice-success { background: #d7ecdd; color: #00A94F; }
+.notice-ki { background: #fbf3e2; color: #4a3a12; border: 1px solid #f0d29a; }
 .notice-draft { background: #eaf0f8; color: #294f3c; margin: 0; }
 .notice-info { background: #eaf0f8; color: #294f3c; margin: 0; }
 .notice-card-validierung { background: #eaf0f8; padding: 12px 16px; }

@@ -203,7 +203,7 @@ function kiSystemPrompt_(ass1GSE) {
     "- Meilenstein-Vorschlag: nur bis Ende des ersten " + (ass1GSE ? "Semesters" : "Trimesters") + ", 4–6 Meilensteine mit Datum (ab dem heutigen Datum) und überprüfbarem Ergebnis, nicht nur einem Thema.",
     "- Wenn der Plan gut ist, mach wenige Kommentare. Erfinde keine Mängel.",
     "",
-    "Alles im Feld „fuer_lehrer“ sehen nur die Lehrer. Schreibe es auf Deutsch, knapp.",
+    "Alles im Feld „fuer_lehrer“ sehen nur die Lehrer. Schreibe es auf Deutsch, knapp. „raster_punkte“ enthält dieselbe Einschätzung wie „raster_schaetzung“ als ganze Zahlen (Beschreibung 0–15, Motivation 0–3, Ziele 0–6, Aufgaben 0–6). Sie ist ein Vorschlag; die Lehrer entscheiden.",
   ].join("\n");
 }
 
@@ -253,10 +253,21 @@ const KI_FEEDBACK_SCHEMA = {
     fuer_lehrer: {
       type: "object",
       additionalProperties: false,
-      required: ["zusammenfassung", "raster_schaetzung", "ki_indizien", "gespraechsfragen"],
+      required: ["zusammenfassung", "raster_schaetzung", "raster_punkte", "ki_indizien", "gespraechsfragen"],
       properties: {
         zusammenfassung: { type: "string" },
         raster_schaetzung: { type: "string", description: "z. B. Beschreibung 8/15, Motivation 2/3, Ziele 3/6, Aufgaben 1/6 – mit je einem Halbsatz Begründung" },
+        raster_punkte: {
+          type: "object",
+          additionalProperties: false,
+          required: ["beschreibung", "motivation", "ziele", "aufgaben"],
+          properties: {
+            beschreibung: { type: "integer", description: "0–15" },
+            motivation: { type: "integer", description: "0–3" },
+            ziele: { type: "integer", description: "0–6" },
+            aufgaben: { type: "integer", description: "0–6" },
+          },
+        },
         ki_indizien: { type: "string", description: "leer lassen, wenn es keine Hinweise gibt" },
         gespraechsfragen: { type: "array", items: { type: "string" } },
       },
