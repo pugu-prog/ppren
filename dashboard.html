@@ -64,6 +64,10 @@ function App() {
   const [feedbackDragOver, setFeedbackDragOver] = useState(false);
   const [feedbackSenden, setFeedbackSenden] = useState(false);
   const [feedbackLoeschId, setFeedbackLoeschId] = useState(null);
+  const [plangFeedbackChecks, setPlangFeedbackChecks] = useState([]);
+  const [checkModal, setCheckModal] = useState(null);
+  const [checkLaeuftId, setCheckLaeuftId] = useState(null);
+  const [checkFehler, setCheckFehler] = useState(null);
 
   // Matrikelnummer -> Virnumm (aus der Personen-Lëscht vum Backend), fir
   // hannert der Nummer och de Virnumm unzeweisen.
@@ -91,6 +95,7 @@ function App() {
         setAusgaben(data.ausgaben || []);
         setPlangKommentarer(data.plangKommentarer || []);
         setPlangFeedbackPdfs(data.plangFeedbackPdfs || []);
+        setPlangFeedbackChecks(data.plangFeedbackChecks || []);
         setPersonen(data.personen || []);
       })
       .catch(() => setError("Konnte Übersicht nicht laden."))
@@ -243,6 +248,73 @@ function App() {
     }
   };
 
+  // ===== Feedback-Check (KI): gouf d'Feedback am neie Projektplang ëmgesat? =====
+  const zeitVun = (wert) => {
+    if (!wert) return 0;
+    const t = String(wert);
+    const m = t.match(/(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+    if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)).getTime();
+    const d = Date.parse(t);
+    return isNaN(d) ? 0 : d;
+  };
+  const letzterCheckFuer = (schueler) => {
+    const l = plangFeedbackChecks.filter((c) => c.Schüler === schueler);
+    return l.length ? l.reduce((a, b) => (zeitVun(b.Erstallt) >= zeitVun(a.Erstallt) ? b : a)) : null;
+  };
+  // 🔔 = de Schüler huet de Plang NOM leschte Feedback nei areecht an et gouf nach kee Check.
+  const neiNoFeedback = (p) => {
+    const fb = feedbackFuer(p.Schüler);
+    if (fb.length === 0 || !String(p.Status || "").startsWith("Ein")) return false;
+    const letztesFb = Math.max(...fb.map((f) => zeitVun(f.Erstallt)));
+    const c = letzterCheckFuer(p.Schüler);
+    const planZait = zeitVun(p["Zuletzt aktualisiert"]);
+    return planZait > letztesFb && planZait > (c ? zeitVun(c.Erstallt) : 0);
+  };
+  const oeffneCheck = (schueler, klasse) => {
+    setCheckFehler(null);
+    setCheckModal({ schueler, klasse });
+  };
+  const schliesCheck = () => {
+    if (checkLaeuftId) return;
+    setCheckModal(null);
+  };
+  const starteCheck = async () => {
+    if (!checkModal) return;
+    if (!window.confirm("D'Feedback-PDF(en) (mat dem Schülernumm am Kapp) an den Projektplang-Text ginn elo un d'Claude-API geschéckt. Weiderfueren?")) return;
+    const { schueler, klasse } = checkModal;
+    setCheckLaeuftId(schueler);
+    setCheckFehler(null);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ typ: "plangFeedbackCheck", token: window.PPREN_SESSION?.token || "", schueler, klasse }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      setPlangFeedbackChecks((l) => [...l, {
+        ID: data.id, Schüler: schueler, Klasse: klasse, Erstallt: data.erstallt, VunProf: "",
+        "Feedback-Dateien": (data.dateien || []).join(" | "),
+        Zesummefaassung: data.resultat.zesummefaassung,
+        "Resultat (JSON)": JSON.stringify(data.resultat),
+      }]);
+    } catch (e) {
+      setCheckFehler(e.message);
+    } finally {
+      setCheckLaeuftId(null);
+    }
+  };
+  const checkAktuell = checkModal ? letzterCheckFuer(checkModal.schueler) : null;
+  let checkResultat = null;
+  if (checkAktuell) {
+    try { checkResultat = JSON.parse(checkAktuell["Resultat (JSON)"]); } catch (e) { checkResultat = null; }
+  }
+  const CHECK_STATUS = {
+    emgesat: { label: "✅ ëmgesat", klass: "check-emgesat" },
+    deelweis: { label: "🟡 deelweis", klass: "check-deelweis" },
+    oppen: { label: "⛔ oppen", klass: "check-oppen" },
+  };
+
   const ausgiFuer = (schueler) => ausgaben.filter((a) => a.Schüler === schueler).reduce((s, a) => s + (Number(a.Betrag) || 0), 0);
 
   const statusAendern = async (schueler, periode, neuerStatus) => {
@@ -374,6 +446,7 @@ function App() {
                 const meta = statusMeta(p.Status);
                 const ks = kommentarerFuer(p.Schüler);
                 const fbn = feedbackFuer(p.Schüler).length;
+                const neiFb = neiNoFeedback(p);
                 const oppen = ks.filter((k) => k.Erledegt !== "Jo").length;
                 const expanded = expandedSchueler === p.Schüler;
                 return (
@@ -420,6 +493,16 @@ function App() {
                           <button type="button" className="btn-gen" onClick={() => oeffneFeedbackModal(p.Schüler, p.Klasse)} title="Feedback als PDF eroplueden">
                             📄 PDF{fbn > 0 ? ` (${fbn})` : ""}
                           </button>
+                          {fbn > 0 && (
+                            <button
+                              type="button"
+                              className={`btn-gen${neiFb ? " btn-gen-warn" : ""}`}
+                              onClick={() => oeffneCheck(p.Schüler, p.Klasse)}
+                              title={neiFb ? "Nei areecht nom Feedback — Feedback-Check méiglech" : "Feedback-Check: gouf d'Feedback ëmgesat?"}
+                            >
+                              🔍 Check{neiFb ? " 🔔" : ""}
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td>
@@ -623,6 +706,48 @@ function App() {
         </div>
       )}
 
+      {checkModal && (
+        <div className="modal-overlay" onClick={schliesCheck}>
+          <div className="modal-box modal-box-breet" onClick={(e) => e.stopPropagation()}>
+            <h3>🔍 Feedback-Check — {ufweis(checkModal.schueler)}</h3>
+            <p className="modal-hint">
+              KI-Ufangsbewäertung: gouf d'Feedback am aktuelle Projektplang ëmgesat? De Prof entscheed. Nëmme Proffen gesinn dat, de Schüler net.
+            </p>
+            {checkFehler && <div className="check-fehler">{checkFehler}</div>}
+            {checkAktuell && checkResultat ? (
+              <>
+                <p className="check-meta">
+                  Check vum {String(checkAktuell.Erstallt)}{checkAktuell.VunProf ? ` · ${checkAktuell.VunProf}` : ""}
+                  {checkAktuell["Feedback-Dateien"] ? ` · Feedback: ${checkAktuell["Feedback-Dateien"]}` : ""}
+                </p>
+                {checkResultat.zesummefaassung && <p className="check-zesummefaassung">{checkResultat.zesummefaassung}</p>}
+                <ul className="check-liste">
+                  {(checkResultat.punkten || []).map((k, i) => {
+                    const st = CHECK_STATUS[k.status] || CHECK_STATUS.oppen;
+                    return (
+                      <li key={i} className={st.klass}>
+                        <span className="check-status">{st.label}</span>
+                        <span className="check-punkt">{k.punkt}</span>
+                        {k.beleg && <span className="check-beleg">{k.beleg}</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {checkResultat.proffHiweis && <p className="check-hiweis">💡 {checkResultat.proffHiweis}</p>}
+              </>
+            ) : (
+              <p className="modal-hint">Nach kee Check fir dëse Schüler.</p>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="btn-gen" onClick={schliesCheck} disabled={!!checkLaeuftId}>Zoumaachen</button>
+              <button type="button" className="btn-gen btn-gen-primary" onClick={starteCheck} disabled={!!checkLaeuftId}>
+                {checkLaeuftId ? "Préift… (kann bis zu 1 Minutt daueren)" : checkAktuell ? "🔍 Nei préifen" : "🔍 Check starten"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {feedbackModal && (
         <div className="modal-overlay" onClick={schliesFeedbackModal}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -759,6 +884,19 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .fb-liste { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .fb-liste li { display: flex; align-items: center; gap: 10px; font-size: 12.5px; background: #fffaf0; border: 1px solid #f0d29a; padding: 6px 10px; border-radius: 8px; }
 .fb-liste .link { flex: 1 1 auto; word-break: break-all; }
+.modal-box-breet { max-width: 760px; max-height: 88vh; overflow-y: auto; }
+.check-meta { font-size: 11.5px; color: #6d7d74; margin: 0 0 8px; }
+.check-zesummefaassung { font-size: 13.5px; line-height: 1.5; background: #eef3ef; padding: 10px 12px; border-radius: 8px; margin: 0 0 10px; }
+.check-liste { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.check-liste li { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; padding: 8px 10px; border-radius: 8px; border-left: 4px solid #c9d5cd; background: #fafbfa; }
+.check-liste li.check-emgesat { border-left-color: #00A94F; background: #f1faf4; }
+.check-liste li.check-deelweis { border-left-color: #d99a2b; background: #fffaf0; }
+.check-liste li.check-oppen { border-left-color: #c0392b; background: #fdf2f0; }
+.check-status { font-size: 11.5px; font-weight: 800; white-space: nowrap; }
+.check-punkt { font-size: 13px; font-weight: 700; flex: 1 1 60%; }
+.check-beleg { flex: 1 1 100%; font-size: 12px; color: #55625a; }
+.check-hiweis { font-size: 12.5px; color: #8a5a12; background: #fbe8c6; padding: 8px 12px; border-radius: 8px; margin: 0 0 10px; }
+.check-fehler { font-size: 12.5px; color: #8a2b1f; background: #fbe4e1; padding: 8px 12px; border-radius: 8px; margin: 0 0 10px; }
 .fb-meta { font-size: 11px; color: #6d7d74; white-space: nowrap; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
 .btn-gen-primary { color: #fff; background: #00A94F; border-color: #00A94F; }
