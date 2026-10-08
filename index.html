@@ -117,7 +117,7 @@ function App() {
     }
     // Fir de Fall, wou d'Sendung um Server net duerchgaangen ass, mä de
     // Plang trotzdem lokal um Status "Eingereicht"/"Freigegeben" bleift a
-    // sech dofir net méi änneren léisst: setzt just DE STATUS vum aktuell
+    // sech dofir net méi ännere léisst: setzt just DE STATUS vum aktuell
     // ugemellte Schüler zréck op "Entwurf", ouni seng agedroe Donnéeën
     // unzeréieren. Opruff: index.html?reopen=mir
     if (params.get("reopen") === "mir") {
@@ -181,6 +181,7 @@ function App() {
   const [docPdfUrl, setDocPdfUrl] = useState(null);
   const [msSyncInfo, setMsSyncInfo] = useState(null);
   const [kommentarer, setKommentarer] = useState([]);
+  const [feedbackPdfs, setFeedbackPdfs] = useState([]);
   const [kommentarAendertId, setKommentarAendertId] = useState(null);
   const [serverSync, setServerSync] = useState(null);
   const [statusReopenedNotice, setStatusReopenedNotice] = useState(false);
@@ -208,6 +209,7 @@ function App() {
       .then((res) => res.json())
       .then((data) => {
         setKommentarer((data.plangKommentarer || []).filter((k) => k.Schüler === currentSchueler.name));
+        setFeedbackPdfs((data.plangFeedbackPdfs || []).filter((f) => f.Schüler === currentSchueler.name));
 
         // Wann op DËSEM Gerät nach kee lokale Entworf mat richtegem Inhalt
         // do ass (z.B. Prof, deen en Schüler op sengem eegene Gerät
@@ -334,7 +336,7 @@ function App() {
       // Den Status gëtt bewosst eréischt HEI, no engem erfollegräichen
       // Backend-Send, geännert — sou kann d'Formulaire nëmmen dann gespaart
       // ginn, wann de Plang wierklech beim Prof ukomm ass. Feelt de Send,
-      // bleift alles um Status "Entwurf" a bleift editéierbar.
+      // bleift alles um Status "Entwurf" a bleift edittéierbar.
       update({ status });
       setDocUrl(resultat.url);
       setDocPdfUrl(resultat.pdfUrl || null);
@@ -434,6 +436,19 @@ function App() {
                 <p className="field-hint" style={{ margin: "-4px 0 14px" }}>
                   ☁️ Inhalt vum Server geluede (leschte gespäicherte Stand, well op dësem Gerät nach kee lokale Entworf war).
                 </p>
+              )}
+              {feedbackPdfs.length > 0 && (
+                <section className="card kommentar-card">
+                  <h2>📄 Feedback vum Betreier (PDF)</h2>
+                  <div className="kommentar-list">
+                    {[...feedbackPdfs].reverse().map((f) => (
+                      <div key={f.ID} className="kommentar-row">
+                        <div className="kommentar-text"><a className="doc-link" href={f.Link} target="_blank" rel="noreferrer">📄 {f.Dateiname} ↗</a></div>
+                        <div className="kommentar-meta">{f.VunProf} · {f.Erstallt}</div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               )}
               {kommentarer.length > 0 && (
                 <section className="card kommentar-card">
@@ -598,7 +613,7 @@ function App() {
                         {budgetUeberschritten && <span className="over-label">Budget überschritten</span>}
                       </div>
                       <p className="field-hint" style={{ marginTop: "8px" }}>
-                        💡 Dëse Kostenplang ass nëmmen eng Plangung. Fir tatsächlech Ausgaben anzedroen (nodeem den Prof de Kostenplang genehmegt huet), benotz d'<a href="budget.html">Budget-Tool</a>.
+                        💡 Dëse Kostenplang ass nëmmen eng Plangung. Fir tatsächlech Ausgaben anzedroen (nodeems den Prof de Kostenplang genehmegt huet), benotz d'<a href="budget.html">Budget-Tool</a>.
                       </p>
                     </div>
                   )}
@@ -628,7 +643,7 @@ function App() {
               </div>
               {!locked && plan.status === "Entwurf" && (
                 <p className="field-hint" style={{ margin: "-6px 0 14px" }}>
-                  💾 <strong>Späicheren</strong> synchroniséiert de Plang mat Google Drive (den Betreier kann en dann nokucken), bleift awer op „Entwurf" — du kanns nach weiderschaffen. <strong>„Zur Genehmigung einreichen"</strong> spaart de Plang fir de Betreier a gëtt gespaart, bis en en nees opmécht.
+                  💾 <strong>Späicheren</strong> synchroniséiert de Plang mat Google Drive (den Betreier kann en dann nokucken), bleift awer op „Entwurf" — du kanns nach weiderschaffen. <strong>„Zur Genehmigung einreichen"</strong> spaart de Plang fir de Betreier a gëtt gespaart, bis en en nees op mécht.
                 </p>
               )}
               {syncError && <div className="sync-error">{syncError}</div>}
