@@ -53,7 +53,7 @@ function App() {
       .finally(() => setPersonenGelueden(true));
   }, []);
   const SCHUELER = useMemo(
-    () => personen.filter((p) => p.rolle === "Schüler").map((p) => ({ id: p.numm, name: p.numm, klasse: p.klasse })),
+    () => personen.filter((p) => p.rolle === "Schüler").map((p) => ({ id: p.numm, name: p.numm, virnumm: p.virnumm || "", klasse: p.klasse })),
     [personen]
   );
 
@@ -160,7 +160,7 @@ function App() {
     });
 
     const zeilen = [];
-    zeilen.push(`VERGANG DES PROJEKTS — ${currentSchueler?.name || ""}`);
+    zeilen.push(`VERGANG DES PROJEKTS — ${currentSchueler?.name || ""}${currentSchueler?.virnumm ? " · " + currentSchueler.virnumm : ""}`);
     zeilen.push("");
     meilensteng.forEach((m) => {
       zeilen.push(`## ${formatDatumKuerz(m.datum)} — ${m.titel} (${m.status || "Ausstoend"})`);
@@ -204,14 +204,14 @@ function App() {
           {istSchueler ? (
             <div className="field">
               <span className="field-label">Ugemellt als</span>
-              <div className="identitaet-box">👤 {currentSchueler?.name} ({currentSchueler?.klasse})</div>
+              <div className="identitaet-box">👤 {currentSchueler?.name}{currentSchueler?.virnumm ? ` · ${currentSchueler.virnumm}` : ""} ({currentSchueler?.klasse})</div>
             </div>
           ) : (
             <label className="field">
               <span className="field-label">Schüler/-in</span>
               <select className="select" value={schuelerId} onChange={(e) => setSchuelerId(e.target.value)}>
                 <option value="">– auswählen –</option>
-                {SCHUELER.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {SCHUELER.map((s) => <option key={s.id} value={s.id}>{s.virnumm ? `${s.virnumm} — ` : ""}{s.name} ({s.klasse})</option>)}
               </select>
             </label>
           )}

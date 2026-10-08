@@ -126,8 +126,13 @@ function App() {
       .then((d) => setPersonen(d.personen || []))
       .catch(() => {});
   }, []);
+  // Matricule -> "Matricule · Virnumm" fir d'Uweisen
+  const ufweis = (numm) => {
+    const p = personen.find((x) => x.numm === numm);
+    return p && p.virnumm ? `${numm} · ${p.virnumm}` : numm;
+  };
   const SCHUELER = useMemo(
-    () => personen.filter((p) => p.rolle === "Schüler").map((p) => ({ id: p.numm, name: p.numm, klasse: p.klasse })),
+    () => personen.filter((p) => p.rolle === "Schüler").map((p) => ({ id: p.numm, name: p.numm, virnumm: p.virnumm || "", klasse: p.klasse })),
     [personen]
   );
 
@@ -217,12 +222,12 @@ function App() {
 
   const exportAlles = () => {
     if (nurZukunft.length === 0) return;
-    laadIcsErof(baueIcsKalenner(nurZukunft), "PPREN_Rendezvousen.ics");
+    laadIcsErof(baueIcsKalenner(nurZukunft.map((x) => ({ ...x, Schüler: ufweis(x.Schüler) }))), "PPREN_Rendezvousen.ics");
   };
 
   const exportEent = (r) => {
     const dateiName = `PPREN_${(r.Schüler || "").replace(/\s+/g, "_")}_${(r.Datum || "").replace(/\./g, "-")}.ics`;
-    laadIcsErof(baueIcsKalenner([r]), dateiName);
+    laadIcsErof(baueIcsKalenner([{ ...r, Schüler: ufweis(r.Schüler) }]), dateiName);
   };
 
   return (
@@ -242,7 +247,7 @@ function App() {
               <span className="field-label">Schüler/-in</span>
               <select className="select" value={schuelerId} onChange={(e) => setSchuelerId(e.target.value)}>
                 <option value="">– auswählen –</option>
-                {SCHUELER.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.klasse})</option>)}
+                {SCHUELER.map((s) => <option key={s.id} value={s.id}>{s.virnumm ? `${s.virnumm} — ` : ""}{s.name} ({s.klasse})</option>)}
               </select>
             </label>
             <label className="field">
@@ -291,7 +296,7 @@ function App() {
                   <tr key={i}>
                     <td>{r.Datum || "–"}</td>
                     <td>{r.Zäit || "–"}</td>
-                    <td>{r.Schüler}</td>
+                    <td>{ufweis(r.Schüler)}</td>
                     <td>{r.Typ}</td>
                     <td><span className={`pill ${r.Erënnert === "Jo" ? "pill-done" : "pill-pending"}`}>{r.Erënnert === "Jo" ? "Jo" : "Nach net"}</span></td>
                     <td><button className="icon-btn icon-btn-kal" onClick={() => exportEent(r)} title="Als .ics exportéieren">📅</button></td>
@@ -310,7 +315,7 @@ function App() {
               <thead><tr><th>Datum</th><th>Schüler/-in</th><th>Typ</th></tr></thead>
               <tbody>
                 {vergaangen.slice(-10).map((r, i) => (
-                  <tr key={i}><td>{r.Datum || "–"}</td><td>{r.Schüler}</td><td>{r.Typ}</td></tr>
+                  <tr key={i}><td>{r.Datum || "–"}</td><td>{ufweis(r.Schüler)}</td><td>{r.Typ}</td></tr>
                 ))}
               </tbody>
             </table>

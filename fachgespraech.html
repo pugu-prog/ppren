@@ -90,7 +90,7 @@ function App() {
       .catch(() => {});
   }, []);
   const SCHUELER = useMemo(
-    () => personen.filter((p) => p.rolle === "Schüler").map((p) => ({ id: p.numm, name: p.numm, klasse: p.klasse })),
+    () => personen.filter((p) => p.rolle === "Schüler").map((p) => ({ id: p.numm, name: p.numm, virnumm: p.virnumm || "", klasse: p.klasse })),
     [personen]
   );
 
@@ -245,7 +245,7 @@ function App() {
               <span className="field-label">Schüler/-in</span>
               <select className="select" value={schuelerId} onChange={(e) => { setSchuelerId(e.target.value); setPeriode(""); }}>
                 <option value="">– auswählen –</option>
-                {SCHUELER.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.klasse})</option>)}
+                {SCHUELER.map((s) => <option key={s.id} value={s.id}>{s.virnumm ? `${s.virnumm} — ` : ""}{s.name} ({s.klasse})</option>)}
               </select>
             </label>
             <label className="field">
@@ -337,7 +337,7 @@ function App() {
 
             {bisherig.length > 0 && (
               <section className="card">
-                <h2>Bisherech Fachgespréicher — {currentSchueler.name}</h2>
+                <h2>Bisherech Fachgespréicher — {currentSchueler.name}{currentSchueler.virnumm ? ` · ${currentSchueler.virnumm}` : ""}</h2>
                 <table className="tabelle">
                   <thead><tr><th>Datum</th><th>Periode</th><th>Variante</th><th>Punkten</th></tr></thead>
                   <tbody>

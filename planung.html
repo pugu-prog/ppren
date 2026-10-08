@@ -90,7 +90,7 @@ function App() {
       .finally(() => setPersonenGelueden(true));
   }, []);
   const SCHUELER = useMemo(
-    () => personen.filter((p) => p.rolle === "Schüler").map((p) => ({ id: p.numm, name: p.numm, klasse: p.klasse })),
+    () => personen.filter((p) => p.rolle === "Schüler").map((p) => ({ id: p.numm, name: p.numm, virnumm: p.virnumm || "", klasse: p.klasse })),
     [personen]
   );
 
@@ -283,7 +283,7 @@ function App() {
         <section className="card">
           {gespaart && currentSchueler ? (
             <div className="gespaart-row">
-              <span className="gespaart-label">👤 {currentSchueler.name} ({currentSchueler.klasse})</span>
+              <span className="gespaart-label">👤 {currentSchueler.name}{currentSchueler.virnumm ? ` · ${currentSchueler.virnumm}` : ""} ({currentSchueler.klasse})</span>
               {!istSchueler && <button className="link-btn-klein" onClick={() => setGespaart(false)}>Net dee/déi hei? Wiesselen</button>}
             </div>
           ) : (
@@ -291,7 +291,7 @@ function App() {
               <span className="field-label">Wie bass du?</span>
               <select className="select" value={schuelerId} onChange={(e) => setSchuelerId(e.target.value)}>
                 <option value="">– auswählen –</option>
-                {SCHUELER.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.klasse})</option>)}
+                {SCHUELER.map((s) => <option key={s.id} value={s.id}>{s.virnumm ? `${s.virnumm} — ` : ""}{s.name} ({s.klasse})</option>)}
               </select>
             </label>
           )}

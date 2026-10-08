@@ -37,6 +37,7 @@ function App() {
       .then((d) => setPersonen(d.personen || []))
       .catch(() => {});
   }, []);
+  const virnummVun = (numm) => (personen.find((p) => p.numm === numm) || {}).virnumm || "";
   const SCHUELER = useMemo(() => personen.filter((p) => p.rolle === "Schüler").map((p) => p.numm), [personen]);
   const PROFFEN = useMemo(() => personen.filter((p) => p.rolle === "Prof").map((p) => p.numm), [personen]);
 
@@ -108,7 +109,7 @@ function App() {
             <span className="field-label">Numm</span>
             <select className="select" value={numm} onChange={(e) => { setNumm(e.target.value); setResultat(null); }}>
               <option value="">– auswählen –</option>
-              {nimm.map((n) => <option key={n} value={n}>{n}</option>)}
+              {nimm.map((n) => <option key={n} value={n}>{virnummVun(n) ? `${virnummVun(n)} — ${n}` : n}</option>)}
             </select>
           </label>
 
@@ -135,7 +136,7 @@ function App() {
         {resultat && (
           <section className="card resultat-card">
             <span className="resultat-label">Neie PIN/Passwuert fir</span>
-            <span className="resultat-numm">{resultat.numm}</span>
+            <span className="resultat-numm">{resultat.numm}{virnummVun(resultat.numm) ? ` · ${virnummVun(resultat.numm)}` : ""}</span>
             <div className="pin-box">
               <span className="pin-zuel">{resultat.pin}</span>
               <button className="btn-gen" onClick={kopéieren}>{kopéiert ? "✓ Kopéiert" : "📋 Kopéieren"}</button>
