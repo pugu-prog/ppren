@@ -53,7 +53,7 @@ function escapeIcs(text) {
   return String(text).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 }
 
-/** Baut een eenzelnen VEVENT-Block. Mat Zäit: 30 Min. Dauer. Ouni Zäit: ganzen Dag. */
+/** Baut een eenzelnen VEVENT-Block. Mat Zäit: Dauer aus der Tabell (soss 30 Min.). Ouni Zäit: ganzen Dag. */
 function baueIcsEvent(r) {
   const [t, m, j] = (r.Datum || "").split(".");
   if (!t || !m || !j) return "";
@@ -65,8 +65,8 @@ function baueIcsEvent(r) {
     const [hh, mi] = r.Zäit.split(":");
     const dtstart = `${j}${m}${t}T${pad(hh)}${pad(mi)}00`;
     let endH = parseInt(hh, 10);
-    let endM = parseInt(mi, 10) + 30;
-    if (endM >= 60) { endM -= 60; endH += 1; }
+    let endM = parseInt(mi, 10) + (Number(r.Dauer) || 30);
+    while (endM >= 60) { endM -= 60; endH += 1; }
     if (endH >= 24) endH -= 24;
     const dtend = `${j}${m}${t}T${pad(endH)}${pad(endM)}00`;
     dtstartZeil = `DTSTART:${dtstart}`;
@@ -117,6 +117,85 @@ function laadIcsErof(inhalt, dateiName) {
 }
 // ===== Enn M8 =====
 
+// ===== Slots & automatesch Verdeelen =====
+// Fräi Zäit fir Rendez-vousen: Méindes 13:10–15:50, Dënschdes 13:10–14:50 (getUTCDay: 1 = Méindeg, 2 = Dënschdeg)
+const SLOTS = { 1: { vun: "13:10", bis: "15:50" }, 2: { vun: "13:10", bis: "14:50" } };
+const DAUER_STANDARD = { "Fachgespréich": 20, "Ziel-Iwwerpréiwung": 15 };
+const DEEG = ["So", "Mé", "Dë", "Më", "Do", "Fr", "Sa"];
+const DEEG_LANG = ["Sonndeg", "Méindeg", "Dënschdeg", "Mëttwoch", "Donneschdeg", "Freideg", "Samschdeg"];
+// Wéi eng Timeline-Evenementer zu wéi engem Typ passen
+const PASST_ZU_TYP = {
+  "Ziel-Iwwerpréiwung": (e) => e.Kategorie === "Iwwerpréiwung" || /ziler|ziel/i.test(e.Titel || ""),
+  "Fachgespréich": (e) => /fachgespr/i.test(e.Titel || ""),
+};
+
+function minVun(hhmm) { const [h, m] = String(hhmm).split(":").map(Number); return h * 60 + m; }
+function zaeitVun(min) { return `${pad(Math.floor(min / 60))}:${pad(min % 60)}`; }
+function isoDatum(d) { return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
+function isoDag(iso) { const [j, m, t] = iso.split("-").map(Number); return new Date(Date.UTC(j, m - 1, t)); }
+function isoPlus(iso, n) { const d = isoDag(iso); d.setUTCDate(d.getUTCDate() + n); return isoDatum(d); }
+function wochendag(iso) { return isoDag(iso).getUTCDay(); }
+function montagVun(iso) { const wd = wochendag(iso); return isoPlus(iso, wd === 0 ? -6 : 1 - wd); }
+function kuerz(iso) { const [, m, t] = iso.split("-"); return `${t}.${m}.`; }
+function istZaeit(z) { return /^\d{1,2}:\d{2}$/.test(String(z || "")); }
+
+/** Besat Intervaller [start, enn] a Minutten pro Dag (iso) aus de bestoende Rendez-vousen. */
+function besatVun(rendezvousen) {
+  const besat = {};
+  rendezvousen.forEach((r) => {
+    if (!istZaeit(r.Zäit)) return;
+    const iso = dmyZuIso(r.Datum);
+    const s = minVun(r.Zäit);
+    (besat[iso] = besat[iso] || []).push([s, s + (Number(r.Dauer) || 30)]);
+  });
+  return besat;
+}
+
+/** Verdeelt d'Schüler der Rei no op déi fräi Slots ab der Woch vu startIso. */
+function verdeelen({ schueler, startIso, dauer, puffer, besat, ausgeloos, minIso }) {
+  const out = [];
+  let i = 0;
+  let iso = montagVun(startIso);
+  for (let n = 0; n < 140 && i < schueler.length; n++, iso = isoPlus(iso, 1)) {
+    const slot = SLOTS[wochendag(iso)];
+    if (!slot || iso < minIso || ausgeloos.has(iso)) continue;
+    const bl = [...(besat[iso] || [])];
+    let t = minVun(slot.vun);
+    const enn = minVun(slot.bis);
+    while (i < schueler.length && t + dauer <= enn) {
+      const konflikt = bl.find(([a, b]) => t < b && t + dauer > a);
+      if (konflikt) { t = konflikt[1]; continue; }
+      out.push({ ...schueler[i], iso, zaeit: zaeitVun(t), dauer });
+      bl.push([t, t + dauer]);
+      t += dauer + puffer;
+      i++;
+    }
+  }
+  return { virschlag: out, netPlaz: schueler.slice(i) };
+}
+
+async function schecken(rendezvousen, mailSchecken) {
+  const res = await fetch(WEB_APP_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      typ: "rendezvousenPlangen",
+      token: window.PPREN_SESSION?.token || "",
+      erstalltVum: window.PPREN_SESSION?.numm || "",
+      mailSchecken,
+      rendezvousen,
+    }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+  return data;
+}
+
+function mailInfo(d, mailSchecken) {
+  if (!mailSchecken) return "";
+  return ` · ${d.mailen || 0} Mail(en) geschéckt` + (d.ouniMail && d.ouniMail.length ? ` (keng E-Mail fir: ${d.ouniMail.join(", ")})` : "");
+}
+
 function App() {
   // M1: Nimm live vum Backend lueden, keng hart-codéiert Lëscht méi.
   const [personen, setPersonen] = useState([]);
@@ -135,17 +214,32 @@ function App() {
     () => personen.filter((p) => p.rolle === "Schüler").map((p) => ({ id: p.numm, name: p.numm, virnumm: p.virnumm || "", klasse: p.klasse })),
     [personen]
   );
+  const KLASSEN = useMemo(() => [...new Set(SCHUELER.map((s) => s.klasse).filter(Boolean))].sort(), [SCHUELER]);
 
+  const [modus, setModus] = useState("auto");
   const [schuelerId, setSchuelerId] = useState("");
-  const [typ, setTyp] = useState("Fachgespréich");
+  const [typ, setTyp] = useState("Ziel-Iwwerpréiwung");
   const [datum, setDatum] = useState(heutegDatumIso());
   const [zaeit, setZaeit] = useState("");
+  const [dauer, setDauer] = useState(DAUER_STANDARD["Ziel-Iwwerpréiwung"]);
   const [notiz, setNotiz] = useState("");
+  const [mailSchecken, setMailSchecken] = useState(true);
   const [rendezvousen, setRendezvousen] = useState([]);
+  const [zaitplang, setZaitplang] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
+
+  // Auto-Plangung
+  const [klass, setKlass] = useState("");
+  const [anker, setAnker] = useState("");
+  const [startIso, setStartIso] = useState(heutegDatumIso());
+  const [puffer, setPuffer] = useState(0);
+  const [ausgeloos, setAusgeloos] = useState(new Set());
+  const [ofgewielt, setOfgewielt] = useState(new Set());
+  const [virschlag, setVirschlag] = useState(null);
+  const [netPlaz, setNetPlaz] = useState([]);
 
   const currentSchueler = SCHUELER.find((s) => s.id === schuelerId);
 
@@ -154,53 +248,119 @@ function App() {
     setError(null);
     fetch(WEB_APP_URL + "?token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""))
       .then((res) => res.json())
-      .then((data) => setRendezvousen(data.rendezvousen || []))
+      .then((data) => {
+        setRendezvousen(data.rendezvousen || []);
+        setZaitplang(data.offiziellZaitplang || []);
+      })
       .catch(() => setError("Konnte Rendez-vous'er net lueden."))
       .finally(() => setLoading(false));
   };
   useEffect(() => { lade(); }, []);
+  useEffect(() => { if (!klass && KLASSEN.length) setKlass(KLASSEN[0]); }, [KLASSEN]);
+  useEffect(() => { setDauer(DAUER_STANDARD[typ] || 20); }, [typ]);
 
   const sortéiert = useMemo(
-    () => [...rendezvousen].sort((a, b) => dmyZuIso(a.Datum).localeCompare(dmyZuIso(b.Datum))),
+    () => [...rendezvousen].sort((a, b) => (dmyZuIso(a.Datum) + (a.Zäit || "")).localeCompare(dmyZuIso(b.Datum) + (b.Zäit || ""))),
     [rendezvousen]
   );
 
   const heidegIso = heutegDatumIso();
   const nurZukunft = sortéiert.filter((r) => dmyZuIso(r.Datum) >= heidegIso);
   const vergaangen = sortéiert.filter((r) => dmyZuIso(r.Datum) < heidegIso);
+  const besat = useMemo(() => besatVun(rendezvousen), [rendezvousen]);
 
-  const canSubmit = schuelerId && datum;
+  // Timeline: opstoend Evenementer pro Klass, pro Woch + Titel gruppéiert
+  const ankerFir = (kl, nurTyp) => {
+    const gruppen = {};
+    zaitplang
+      .filter((e) => (!kl || e.Klasse === kl) && String(e.Datum) >= isoPlus(heidegIso, -6))
+      .filter((e) => !nurTyp || PASST_ZU_TYP[nurTyp](e))
+      .forEach((e) => {
+        const key = `${montagVun(e.Datum)}|${e.Titel}`;
+        (gruppen[key] = gruppen[key] || { key, montag: montagVun(e.Datum), titel: e.Titel, deeg: [] }).deeg.push(e.Datum);
+      });
+    return Object.values(gruppen).sort((a, b) => a.montag.localeCompare(b.montag));
+  };
+  const ankerLescht = useMemo(() => {
+    const passend = ankerFir(klass, typ);
+    return passend.length ? passend : ankerFir(klass, null);
+  }, [zaitplang, klass, typ]);
+  useEffect(() => {
+    const a = ankerLescht[0];
+    setAnker(a ? a.key : "");
+    if (a) setStartIso(a.montag);
+  }, [ankerLescht]);
 
-  const plangen = async () => {
-    if (!canSubmit) return;
+  const klassSchueler = SCHUELER.filter((s) => s.klasse === klass);
+  // Schüler, déi an där Woch schonn e Rendez-vous vum selwechten Typ hunn
+  const schonnGeplangt = (s) => rendezvousen.find((r) => r.Schüler === s.name && r.Typ === typ &&
+    Math.abs(isoDag(dmyZuIso(r.Datum)) - isoDag(montagVun(startIso))) <= 14 * 864e5);
+  useEffect(() => {
+    setOfgewielt(new Set(klassSchueler.filter((s) => schonnGeplangt(s)).map((s) => s.id)));
+    setAusgeloos(new Set());
+    setVirschlag(null);
+  }, [klass, typ, startIso, SCHUELER, rendezvousen]);
+
+  const maachVirschlag = (ausgeloosNei = ausgeloos) => {
+    const r = verdeelen({
+      schueler: klassSchueler.filter((s) => !ofgewielt.has(s.id)),
+      startIso, dauer: Number(dauer) || 15, puffer: Number(puffer) || 0, besat, ausgeloos: ausgeloosNei, minIso: heidegIso,
+    });
+    setVirschlag(r.virschlag);
+    setNetPlaz(r.netPlaz);
+  };
+  const dagAusloossen = (iso) => {
+    const nei = new Set(ausgeloos); nei.add(iso);
+    setAusgeloos(nei);
+    maachVirschlag(nei);
+  };
+  const virschlagAenneren = (idx, feld, wert) => setVirschlag((v) => v.map((x, i) => (i === idx ? { ...x, [feld]: wert } : x)));
+
+  const autoSpaicheren = async () => {
+    if (!virschlag || virschlag.length === 0) return;
+    if (mailSchecken && !confirm(`${virschlag.length} Rendez-vous(en) späicheren an all Schüler direkt eng Mail schécken?`)) return;
     setSyncing(true);
     setError(null);
     try {
-      const res = await fetch(WEB_APP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          typ: "rendezvousPlangen",
-          token: window.PPREN_SESSION?.token || "",
-          schueler: currentSchueler.name,
-          klasse: currentSchueler.klasse,
-          rvTyp: typ,
-          datum: isoZuDmy(datum),
-          zaeit,
-          notiz,
-          erstalltVum: window.PPREN_SESSION?.numm || "",
-        }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
-      setToast("Rendez-vous geplangt — Schüler kritt 2 Deeg virdrun eng Erënnerung.");
+      const d = await schecken(virschlag.map((v) => ({
+        schueler: v.name, klasse: v.klasse, rvTyp: typ, datum: isoZuDmy(v.iso), zaeit: v.zaeit, dauer: Number(v.dauer) || Number(dauer), notiz,
+      })), mailSchecken);
+      setToast(`${virschlag.length} Rendez-vous(en) geplangt` + mailInfo(d, mailSchecken));
+      setVirschlag(null);
       setNotiz("");
       lade();
     } catch (e) {
       setError("Konnte net plangen: " + e.message);
     } finally {
       setSyncing(false);
-      setTimeout(() => setToast(null), 3500);
+      setTimeout(() => setToast(null), 6000);
+    }
+  };
+
+  // Eenzel-Rendez-vous
+  const canSubmit = schuelerId && datum;
+  const eenzelAnker = useMemo(() => (currentSchueler ? ankerFir(currentSchueler.klasse, null).slice(0, 6) : []), [zaitplang, currentSchueler]);
+  const nächstSlot = () => {
+    const r = verdeelen({ schueler: [{}], startIso: datum, dauer: Number(dauer) || 15, puffer: 0, besat, ausgeloos: new Set(), minIso: datum < heidegIso ? heidegIso : datum });
+    if (r.virschlag[0]) { setDatum(r.virschlag[0].iso); setZaeit(r.virschlag[0].zaeit); }
+  };
+
+  const plangen = async () => {
+    if (!canSubmit) return;
+    setSyncing(true);
+    setError(null);
+    try {
+      const d = await schecken([{
+        schueler: currentSchueler.name, klasse: currentSchueler.klasse, rvTyp: typ, datum: isoZuDmy(datum), zaeit, dauer: zaeit ? Number(dauer) : "", notiz,
+      }], mailSchecken);
+      setToast("Rendez-vous geplangt" + mailInfo(d, mailSchecken));
+      setNotiz("");
+      lade();
+    } catch (e) {
+      setError("Konnte net plangen: " + e.message);
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setToast(null), 5000);
     }
   };
 
@@ -230,6 +390,26 @@ function App() {
     laadIcsErof(baueIcsKalenner([{ ...r, Schüler: ufweis(r.Schüler) }]), dateiName);
   };
 
+  // Virschlag no Deeg gruppéieren
+  const virschlagDeeg = useMemo(() => {
+    if (!virschlag) return [];
+    const g = {};
+    virschlag.forEach((v, idx) => { (g[v.iso] = g[v.iso] || []).push({ ...v, idx }); });
+    return Object.keys(g).sort().map((iso) => ({ iso, eintraeg: g[iso].sort((a, b) => a.zaeit.localeCompare(b.zaeit)) }));
+  }, [virschlag]);
+  const kapazitéit = (() => {
+    const d = Number(dauer) || 15, p = Number(puffer) || 0;
+    const pro = (s) => Math.floor((minVun(s.bis) - minVun(s.vun) + p) / (d + p));
+    return { me: pro(SLOTS[1]), de: pro(SLOTS[2]) };
+  })();
+
+  const mailCheckbox = (
+    <label className="check">
+      <input type="checkbox" checked={mailSchecken} onChange={(e) => setMailSchecken(e.target.checked)} />
+      📧 Schüler direkt per Mail informéieren (mat Kalennerdatei .ics) — 2 Deeg virdrun kënnt nach eng Erënnerung
+    </label>
+  );
+
   return (
     <div className="wrap">
       <header className="topbar">
@@ -240,43 +420,181 @@ function App() {
       </header>
 
       <main className="content">
-        <section className="card">
-          <h2>Neien Rendez-vous plangen</h2>
-          <div className="grid2">
+        <div className="tabs">
+          <button className={`tab ${modus === "auto" ? "tab-aktiv" : ""}`} onClick={() => setModus("auto")}>⚡ Ganz Klass automatesch plangen</button>
+          <button className={`tab ${modus === "eenzel" ? "tab-aktiv" : ""}`} onClick={() => setModus("eenzel")}>👤 Eenzelen Rendez-vous</button>
+        </div>
+
+        {modus === "auto" && (
+          <section className="card">
+            <h2>Ganz Klass automatesch plangen</h2>
+            <p className="hint">
+              ⏰ Fräi Zäit: <b>Méindes 13:10–15:50</b> ({kapazitéit.me} Plazen) an <b>Dënschdes 13:10–14:50</b> ({kapazitéit.de} Plazen) bei {dauer} Min.
+              {Number(puffer) ? ` + ${puffer} Min. Paus` : ""}. Besat Zäiten (aner Rendez-vousen) ginn iwwersprongen.
+            </p>
+            <div className="grid3">
+              <label className="field">
+                <span className="field-label">Klass</span>
+                <select className="select" value={klass} onChange={(e) => setKlass(e.target.value)}>
+                  {KLASSEN.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">Typ</span>
+                <select className="select" value={typ} onChange={(e) => setTyp(e.target.value)}>
+                  {TYPEN.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+              <div className="grid2 grid-tight">
+                <label className="field">
+                  <span className="field-label">Dauer (Min.)</span>
+                  <input type="number" min="5" step="5" className="input" value={dauer} onChange={(e) => setDauer(e.target.value)} />
+                </label>
+                <label className="field">
+                  <span className="field-label">Paus (Min.)</span>
+                  <input type="number" min="0" step="5" className="input" value={puffer} onChange={(e) => setPuffer(e.target.value)} />
+                </label>
+              </div>
+            </div>
+            <div className="grid2">
+              <label className="field">
+                <span className="field-label">Termin aus der Timeline ({klass})</span>
+                <select className="select" value={anker} onChange={(e) => {
+                  setAnker(e.target.value);
+                  const a = ankerLescht.find((x) => x.key === e.target.value);
+                  if (a) setStartIso(a.montag);
+                }}>
+                  {ankerLescht.length === 0 && <option value="">– keng opstoend Terminer –</option>}
+                  {ankerLescht.map((a) => (
+                    <option key={a.key} value={a.key}>
+                      Woch vum {kuerz(a.montag)} · {a.titel} ({a.deeg.map((d) => `${DEEG[wochendag(d)]} ${kuerz(d)}`).join(", ")})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">Plangen ab der Woch vum</span>
+                <input type="date" className="input" value={startIso} onChange={(e) => { setStartIso(e.target.value); setAnker(""); }} />
+              </label>
+            </div>
+
+            <span className="field-label">Schüler/-innen ({klassSchueler.length - ofgewielt.size} vun {klassSchueler.length})</span>
+            <div className="schueler-chips">
+              {klassSchueler.map((s) => {
+                const schonn = schonnGeplangt(s);
+                const dran = !ofgewielt.has(s.id);
+                return (
+                  <label key={s.id} className={`chip ${dran ? "chip-an" : ""}`} title={schonn ? `Huet schonn: ${schonn.Typ} de ${schonn.Datum}` : ""}>
+                    <input type="checkbox" checked={dran} onChange={() => {
+                      const n = new Set(ofgewielt); dran ? n.add(s.id) : n.delete(s.id); setOfgewielt(n); setVirschlag(null);
+                    }} />
+                    {s.virnumm || s.name}{schonn ? ` ✔︎ ${schonn.Datum}` : ""}
+                  </label>
+                );
+              })}
+            </div>
             <label className="field">
-              <span className="field-label">Schüler/-in</span>
-              <select className="select" value={schuelerId} onChange={(e) => setSchuelerId(e.target.value)}>
-                <option value="">– auswählen –</option>
-                {SCHUELER.map((s) => <option key={s.id} value={s.id}>{s.virnumm ? `${s.virnumm} — ` : ""}{s.name} ({s.klasse})</option>)}
-              </select>
+              <span className="field-label">Notiz fir all (optional — kënnt an d'Mail)</span>
+              <textarea className="textarea" rows={2} value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder="z. B. Bréng däi Projektplang an d'Dokumentatioun mat." />
             </label>
+            <button className="btn btn-sec" disabled={klassSchueler.length - ofgewielt.size === 0} onClick={() => maachVirschlag()}>
+              🔄 Virschlag maachen
+            </button>
+
+            {virschlag && (
+              <div className="virschlag">
+                {virschlag.length === 0 && <p className="notice">Keng fräi Plaz fonnt.</p>}
+                {virschlagDeeg.map((d) => (
+                  <div key={d.iso} className="dag-block">
+                    <div className="dag-kapp">
+                      <span>{DEEG_LANG[wochendag(d.iso)]}, {isoZuDmy(d.iso)}</span>
+                      <button className="btn-link" onClick={() => dagAusloossen(d.iso)} title="Ferien/Ausfall – dësen Dag net benotzen">✕ Dag ausloossen</button>
+                    </div>
+                    <table className="tabelle">
+                      <tbody>
+                        {d.eintraeg.map((v) => (
+                          <tr key={v.idx}>
+                            <td className="col-zaeit"><input type="time" className="input input-kleng" value={v.zaeit} onChange={(e) => virschlagAenneren(v.idx, "zaeit", e.target.value)} /></td>
+                            <td>{zaeitVun(minVun(v.zaeit) + Number(v.dauer))}</td>
+                            <td>{v.virnumm ? `${v.virnumm} · ` : ""}{v.name}</td>
+                            <td><input type="date" className="input input-kleng" value={v.iso} onChange={(e) => virschlagAenneren(v.idx, "iso", e.target.value)} /></td>
+                            <td><button className="icon-btn" title="Aus dem Virschlag huelen" onClick={() => setVirschlag((x) => x.filter((_, i) => i !== v.idx))}>✕</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+                {ausgeloos.size > 0 && (
+                  <p className="notice">Ausgeloos: {[...ausgeloos].sort().map(isoZuDmy).join(", ")} · <button className="btn-link" onClick={() => { setAusgeloos(new Set()); maachVirschlag(new Set()); }}>zerécksetzen</button></p>
+                )}
+                {netPlaz.length > 0 && <div className="sync-error">Keng Plaz fonnt fir: {netPlaz.map((s) => s.virnumm || s.name).join(", ")}</div>}
+                {mailCheckbox}
+                {error && <div className="sync-error">{error}</div>}
+                <button className="btn btn-primary" disabled={syncing || virschlag.length === 0} onClick={autoSpaicheren}>
+                  {syncing ? "Späichert…" : `✅ ${virschlag.length} Rendez-vous(en) späicheren${mailSchecken ? " & Mail schécken" : ""}`}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {modus === "eenzel" && (
+          <section className="card">
+            <h2>Neien Rendez-vous plangen</h2>
+            <div className="grid2">
+              <label className="field">
+                <span className="field-label">Schüler/-in</span>
+                <select className="select" value={schuelerId} onChange={(e) => setSchuelerId(e.target.value)}>
+                  <option value="">– auswählen –</option>
+                  {SCHUELER.map((s) => <option key={s.id} value={s.id}>{s.virnumm ? `${s.virnumm} — ` : ""}{s.name} ({s.klasse})</option>)}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">Typ</span>
+                <select className="select" value={typ} onChange={(e) => setTyp(e.target.value)}>
+                  {TYPEN.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+            </div>
+            {eenzelAnker.length > 0 && (
+              <div className="field">
+                <span className="field-label">Timeline {currentSchueler.klasse} — klicken fir d'Woch ze iwwerhuelen</span>
+                <div className="schueler-chips">
+                  {eenzelAnker.map((a) => (
+                    <button key={a.key} className="chip chip-btn" onClick={() => setDatum(a.montag < heidegIso ? heidegIso : a.montag)}>
+                      {kuerz(a.deeg[0])} · {a.titel}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="grid3">
+              <label className="field">
+                <span className="field-label">Datum</span>
+                <input type="date" className="input" value={datum} onChange={(e) => setDatum(e.target.value)} />
+              </label>
+              <label className="field">
+                <span className="field-label">Zäit (optional)</span>
+                <input type="time" className="input" value={zaeit} onChange={(e) => setZaeit(e.target.value)} />
+              </label>
+              <label className="field">
+                <span className="field-label">Dauer (Min.)</span>
+                <input type="number" min="5" step="5" className="input" value={dauer} onChange={(e) => setDauer(e.target.value)} />
+              </label>
+            </div>
+            <button className="btn-gen btn-slot" onClick={nächstSlot}>⏱ Nächste fräie Slot ab dësem Datum (Mé/Dë)</button>
             <label className="field">
-              <span className="field-label">Typ</span>
-              <select className="select" value={typ} onChange={(e) => setTyp(e.target.value)}>
-                {TYPEN.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <span className="field-label">Notiz (optional — gëtt an der Mail matgeschéckt)</span>
+              <textarea className="textarea" rows={2} value={notiz} onChange={(e) => setNotiz(e.target.value)} />
             </label>
-          </div>
-          <div className="grid2">
-            <label className="field">
-              <span className="field-label">Datum</span>
-              <input type="date" className="input" value={datum} onChange={(e) => setDatum(e.target.value)} />
-            </label>
-            <label className="field">
-              <span className="field-label">Zäit (optional)</span>
-              <input type="time" className="input" value={zaeit} onChange={(e) => setZaeit(e.target.value)} />
-            </label>
-          </div>
-          <label className="field">
-            <span className="field-label">Notiz (optional — gëtt an der Erënnerungs-Mail matgeschéckt)</span>
-            <textarea className="textarea" rows={2} value={notiz} onChange={(e) => setNotiz(e.target.value)} />
-          </label>
-          <p className="hint">📧 De Schüler kritt automatesch eng Erënnerungs-E-Mail 2 Deeg virum Rendez-vous.</p>
-          {error && <div className="sync-error">{error}</div>}
-          <button className="btn btn-primary" disabled={!canSubmit || syncing} onClick={plangen}>
-            {syncing ? "Plangt…" : "📅 Rendez-vous plangen"}
-          </button>
-        </section>
+            {mailCheckbox}
+            {error && <div className="sync-error">{error}</div>}
+            <button className="btn btn-primary" disabled={!canSubmit || syncing} onClick={plangen}>
+              {syncing ? "Plangt…" : "📅 Rendez-vous plangen"}
+            </button>
+          </section>
+        )}
 
         <section className="card">
           <div className="card-head-row">
@@ -295,7 +613,7 @@ function App() {
                 {nurZukunft.map((r, i) => (
                   <tr key={i}>
                     <td>{r.Datum || "–"}</td>
-                    <td>{r.Zäit || "–"}</td>
+                    <td>{istZaeit(r.Zäit) ? r.Zäit + (r.Dauer ? `–${zaeitVun(minVun(r.Zäit) + Number(r.Dauer))}` : "") : "–"}</td>
                     <td>{ufweis(r.Schüler)}</td>
                     <td>{r.Typ}</td>
                     <td><span className={`pill ${r.Erënnert === "Jo" ? "pill-done" : "pill-pending"}`}>{r.Erënnert === "Jo" ? "Jo" : "Nach net"}</span></td>
@@ -363,6 +681,28 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .icon-btn { border: none; background: transparent; color: #99392f; cursor: pointer; font-size: 13px; width: 24px; height: 24px; border-radius: 6px; }
 .icon-btn-kal { color: #4576B5; }
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1c2621; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 14px; }
+.grid-tight { gap: 8px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.tab { font-size: 13px; font-weight: 700; padding: 8px 14px; border-radius: 8px; border: 1px solid #c9d5cd; background: #fff; color: #294f3c; cursor: pointer; }
+.tab-aktiv { background: #00A94F; color: #fff; border-color: #00A94F; }
+.schueler-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 14px; }
+.chip { font-size: 12.5px; padding: 5px 10px; border-radius: 20px; border: 1px solid #c9d5cd; background: #f4f6f4; color: #6d7d74; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.chip input { margin: 0; }
+.chip-an { background: #e3f4ea; border-color: #00A94F; color: #1c2621; }
+.chip-btn { font-family: inherit; }
+.chip-btn:hover { background: #e3f4ea; }
+.btn-sec { background: #eef3ef; color: #00A94F; border: 1px solid #00A94F; }
+.btn-sec:disabled { color: #b7c6bd; border-color: #c9d5cd; cursor: not-allowed; }
+.btn-slot { margin: -4px 0 14px; }
+.btn-link { border: none; background: none; color: #99392f; font-size: 11.5px; cursor: pointer; padding: 0; font-family: inherit; }
+.virschlag { margin-top: 16px; border-top: 1px solid #e2e8e3; padding-top: 12px; }
+.dag-block { margin-bottom: 12px; }
+.dag-kapp { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: #294f3c; background: #eef3ef; padding: 6px 10px; border-radius: 7px; }
+.col-zaeit { width: 110px; }
+.input-kleng { padding: 4px 6px; font-size: 12.5px; width: auto; }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: #294f3c; margin: 4px 0 14px; cursor: pointer; }
+@media (max-width: 640px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
 </style>
 </body>
 </html>

@@ -785,7 +785,7 @@ function App() {
                       <ul className="rv-liste">
                         {zukunft.map((r, i) => (
                           <li key={i} className="rv-item rv-item-zukunft">
-                            <span className="rv-datum">{r.Datum}{r.Zäit ? ` · ${r.Zäit}` : ""}</span>
+                            <span className="rv-datum">{r.Datum}{/^\d{1,2}:\d{2}$/.test(String(r.Zäit || "")) ? ` · ${r.Zäit}${r.Dauer ? ` (${r.Dauer} Min.)` : ""}` : ""}</span>
                             <span className="rv-typ">{r.Typ}</span>
                             {r.Notiz && <span className="rv-notiz">{r.Notiz}</span>}
                           </li>
