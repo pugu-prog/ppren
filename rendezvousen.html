@@ -120,7 +120,17 @@ function laadIcsErof(inhalt, dateiName) {
 // ===== Slots & automatesch Verdeelen =====
 // Fräi Zäit fir Rendez-vousen: Méindes 13:10–15:50, Dënschdes 13:10–14:50 (getUTCDay: 1 = Méindeg, 2 = Dënschdeg)
 const SLOTS = { 1: { vun: "13:10", bis: "15:50" }, 2: { vun: "13:10", bis: "14:50" } };
-const DAUER_STANDARD = { "Fachgespréich": 20, "Ziel-Iwwerpréiwung": 15 };
+const DAUER_STANDARD = { "Fachgespréich": 20, "Ziel-Iwwerpréiwung": 10 };
+// Dauere wéi an zieluewerpreiwung.html (10–12 Min.) a fachgespraech.html (20 Min. Gespréich)
+const DAUER_OPTIOUNEN = { "Ziel-Iwwerpréiwung": [10, 12] };
+// Fachgespréich: 10 Min. Virbereedung virum Gespréich. De Schüler bereet sech vir, während de virege nach schwätzt,
+// dofir fänkt nëmmen dat éischt Gespréich vum Dag 10 Min. méi spéit un.
+const VIRBEREEDUNG = { "Fachgespréich": 10 };
+function notizMatVirbereedung(typ, notiz) {
+  const v = VIRBEREEDUNG[typ];
+  const hiwais = v ? `Komm ${v} Min. virdrun: ${v} Min. Virbereedungszäit (d'Froe ginn ausgedeelt), duerno d'Gespréich zu der Zäit hei uewen.` : "";
+  return [hiwais, notiz].filter(Boolean).join(" ");
+}
 const DEEG = ["So", "Mé", "Dë", "Më", "Do", "Fr", "Sa"];
 const DEEG_LANG = ["Sonndeg", "Méindeg", "Dënschdeg", "Mëttwoch", "Donneschdeg", "Freideg", "Samschdeg"];
 // Wéi eng Timeline-Evenementer zu wéi engem Typ passen
@@ -152,7 +162,7 @@ function besatVun(rendezvousen) {
 }
 
 /** Verdeelt d'Schüler der Rei no op déi fräi Slots ab der Woch vu startIso. */
-function verdeelen({ schueler, startIso, dauer, puffer, besat, ausgeloos, minIso }) {
+function verdeelen({ schueler, startIso, dauer, puffer, besat, ausgeloos, minIso, virlaf = 0 }) {
   const out = [];
   let i = 0;
   let iso = montagVun(startIso);
@@ -160,7 +170,7 @@ function verdeelen({ schueler, startIso, dauer, puffer, besat, ausgeloos, minIso
     const slot = SLOTS[wochendag(iso)];
     if (!slot || iso < minIso || ausgeloos.has(iso)) continue;
     const bl = [...(besat[iso] || [])];
-    let t = minVun(slot.vun);
+    let t = minVun(slot.vun) + virlaf;
     const enn = minVun(slot.bis);
     while (i < schueler.length && t + dauer <= enn) {
       const konflikt = bl.find(([a, b]) => t < b && t + dauer > a);
@@ -304,7 +314,7 @@ function App() {
   const maachVirschlag = (ausgeloosNei = ausgeloos) => {
     const r = verdeelen({
       schueler: klassSchueler.filter((s) => !ofgewielt.has(s.id)),
-      startIso, dauer: Number(dauer) || 15, puffer: Number(puffer) || 0, besat, ausgeloos: ausgeloosNei, minIso: heidegIso,
+      startIso, dauer: Number(dauer) || 10, puffer: Number(puffer) || 0, besat, ausgeloos: ausgeloosNei, minIso: heidegIso, virlaf: VIRBEREEDUNG[typ] || 0,
     });
     setVirschlag(r.virschlag);
     setNetPlaz(r.netPlaz);
@@ -323,7 +333,7 @@ function App() {
     setError(null);
     try {
       const d = await schecken(virschlag.map((v) => ({
-        schueler: v.name, klasse: v.klasse, rvTyp: typ, datum: isoZuDmy(v.iso), zaeit: v.zaeit, dauer: Number(v.dauer) || Number(dauer), notiz,
+        schueler: v.name, klasse: v.klasse, rvTyp: typ, datum: isoZuDmy(v.iso), zaeit: v.zaeit, dauer: Number(v.dauer) || Number(dauer), notiz: notizMatVirbereedung(typ, notiz),
       })), mailSchecken);
       setToast(`${virschlag.length} Rendez-vous(en) geplangt` + mailInfo(d, mailSchecken));
       setVirschlag(null);
@@ -341,7 +351,7 @@ function App() {
   const canSubmit = schuelerId && datum;
   const eenzelAnker = useMemo(() => (currentSchueler ? ankerFir(currentSchueler.klasse, null).slice(0, 6) : []), [zaitplang, currentSchueler]);
   const nächstSlot = () => {
-    const r = verdeelen({ schueler: [{}], startIso: datum, dauer: Number(dauer) || 15, puffer: 0, besat, ausgeloos: new Set(), minIso: datum < heidegIso ? heidegIso : datum });
+    const r = verdeelen({ schueler: [{}], startIso: datum, dauer: Number(dauer) || 10, puffer: 0, besat, ausgeloos: new Set(), minIso: datum < heidegIso ? heidegIso : datum, virlaf: VIRBEREEDUNG[typ] || 0 });
     if (r.virschlag[0]) { setDatum(r.virschlag[0].iso); setZaeit(r.virschlag[0].zaeit); }
   };
 
@@ -351,7 +361,7 @@ function App() {
     setError(null);
     try {
       const d = await schecken([{
-        schueler: currentSchueler.name, klasse: currentSchueler.klasse, rvTyp: typ, datum: isoZuDmy(datum), zaeit, dauer: zaeit ? Number(dauer) : "", notiz,
+        schueler: currentSchueler.name, klasse: currentSchueler.klasse, rvTyp: typ, datum: isoZuDmy(datum), zaeit, dauer: zaeit ? Number(dauer) : "", notiz: notizMatVirbereedung(typ, notiz),
       }], mailSchecken);
       setToast("Rendez-vous geplangt" + mailInfo(d, mailSchecken));
       setNotiz("");
@@ -398,9 +408,10 @@ function App() {
     return Object.keys(g).sort().map((iso) => ({ iso, eintraeg: g[iso].sort((a, b) => a.zaeit.localeCompare(b.zaeit)) }));
   }, [virschlag]);
   const kapazitéit = (() => {
-    const d = Number(dauer) || 15, p = Number(puffer) || 0;
-    const pro = (s) => Math.floor((minVun(s.bis) - minVun(s.vun) + p) / (d + p));
-    return { me: pro(SLOTS[1]), de: pro(SLOTS[2]) };
+    const d = Number(dauer) || 10, p = Number(puffer) || 0;
+    const v = VIRBEREEDUNG[typ] || 0;
+    const pro2 = (s) => Math.floor((minVun(s.bis) - minVun(s.vun) - v + p) / (d + p));
+    return { me: pro2(SLOTS[1]), de: pro2(SLOTS[2]) };
   })();
 
   const mailCheckbox = (
@@ -430,7 +441,8 @@ function App() {
             <h2>Ganz Klass automatesch plangen</h2>
             <p className="hint">
               ⏰ Fräi Zäit: <b>Méindes 13:10–15:50</b> ({kapazitéit.me} Plazen) an <b>Dënschdes 13:10–14:50</b> ({kapazitéit.de} Plazen) bei {dauer} Min.
-              {Number(puffer) ? ` + ${puffer} Min. Paus` : ""}. Besat Zäiten (aner Rendez-vousen) ginn iwwersprongen.
+              {Number(puffer) ? ` + ${puffer} Min. Paus` : ""}.
+              {VIRBEREEDUNG[typ] ? ` Fachgespréich: ${VIRBEREEDUNG[typ]} Min. Virbereedung virdrun (déi éischt um 13:10, d'Gespréich ab 13:${10 + VIRBEREEDUNG[typ]}) — den Hiwäis kënnt automatesch an d'Mail.` : ""} Besat Zäiten (aner Rendez-vousen) ginn iwwersprongen.
             </p>
             <div className="grid3">
               <label className="field">
@@ -448,12 +460,19 @@ function App() {
               <div className="grid2 grid-tight">
                 <label className="field">
                   <span className="field-label">Dauer (Min.)</span>
-                  <input type="number" min="5" step="5" className="input" value={dauer} onChange={(e) => setDauer(e.target.value)} />
+                  <input type="number" min="5" step="1" className="input" value={dauer} onChange={(e) => setDauer(e.target.value)} />
                 </label>
                 <label className="field">
                   <span className="field-label">Paus (Min.)</span>
                   <input type="number" min="0" step="5" className="input" value={puffer} onChange={(e) => setPuffer(e.target.value)} />
                 </label>
+                {(DAUER_OPTIOUNEN[typ] || []).length > 0 && (
+                  <div className="dauer-knaepp">
+                    {DAUER_OPTIOUNEN[typ].map((m) => (
+                      <button key={m} className={`chip chip-btn ${Number(dauer) === m ? "chip-an" : ""}`} onClick={() => { setDauer(m); setVirschlag(null); }}>{m} Min.</button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="grid2">
@@ -580,7 +599,7 @@ function App() {
               </label>
               <label className="field">
                 <span className="field-label">Dauer (Min.)</span>
-                <input type="number" min="5" step="5" className="input" value={dauer} onChange={(e) => setDauer(e.target.value)} />
+                <input type="number" min="5" step="1" className="input" value={dauer} onChange={(e) => setDauer(e.target.value)} />
               </label>
             </div>
             <button className="btn-gen btn-slot" onClick={nächstSlot}>⏱ Nächste fräie Slot ab dësem Datum (Mé/Dë)</button>
@@ -701,6 +720,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .dag-kapp { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: #294f3c; background: #eef3ef; padding: 6px 10px; border-radius: 7px; }
 .col-zaeit { width: 110px; }
 .input-kleng { padding: 4px 6px; font-size: 12.5px; width: auto; }
+.dauer-knaepp { display: flex; gap: 6px; margin: -10px 0 8px; grid-column: 1 / -1; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: #294f3c; margin: 4px 0 14px; cursor: pointer; }
 @media (max-width: 640px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
 </style>
