@@ -35,6 +35,8 @@ function statusMeta(status) {
   return { key: "draft", label: "Entwurf" };
 }
 
+const FEEDBACK_MAX_MB = 10;
+
 function App() {
   const [projekte, setProjekte] = useState([]);
   const [bewertungen, setBewertungen] = useState([]);
@@ -56,6 +58,12 @@ function App() {
   const [kommentarModalText, setKommentarModalText] = useState("");
   const [kommentarModalSenden, setKommentarModalSenden] = useState(false);
   const [suiviPdfId, setSuiviPdfId] = useState(null);
+  const [plangFeedbackPdfs, setPlangFeedbackPdfs] = useState([]);
+  const [feedbackModal, setFeedbackModal] = useState(null);
+  const [feedbackDateien, setFeedbackDateien] = useState([]);
+  const [feedbackDragOver, setFeedbackDragOver] = useState(false);
+  const [feedbackSenden, setFeedbackSenden] = useState(false);
+  const [feedbackLoeschId, setFeedbackLoeschId] = useState(null);
 
   // Matrikelnummer -> Virnumm (aus der Personen-Lëscht vum Backend), fir
   // hannert der Nummer och de Virnumm unzeweisen.
@@ -82,6 +90,7 @@ function App() {
         setBudget(data.budget || []);
         setAusgaben(data.ausgaben || []);
         setPlangKommentarer(data.plangKommentarer || []);
+        setPlangFeedbackPdfs(data.plangFeedbackPdfs || []);
         setPersonen(data.personen || []);
       })
       .catch(() => setError("Konnte Übersicht nicht laden."))
@@ -162,6 +171,77 @@ function App() {
   };
 
   const kommentarerFuer = (schueler) => plangKommentarer.filter((k) => k.Schüler === schueler);
+
+  // ===== Feedback als PDF zum Projektplang =====
+  const feedbackFuer = (schueler) => plangFeedbackPdfs.filter((f) => f.Schüler === schueler);
+
+  const oeffneFeedbackModal = (schueler, klasse) => {
+    setFeedbackModal({ schueler, klasse });
+    setFeedbackDateien([]);
+  };
+  const schliesFeedbackModal = () => {
+    if (feedbackSenden) return;
+    setFeedbackModal(null);
+    setFeedbackDateien([]);
+  };
+  const feedbackDateienBeifuegen = (fileList) => {
+    const neie = Array.from(fileList || []);
+    const keenPdf = neie.filter((f) => !/\.pdf$/i.test(f.name));
+    if (keenPdf.length > 0) alert("Nëmmen PDF-Dateien sinn erlaabt: " + keenPdf.map((f) => f.name).join(", "));
+    const pdfs = neie.filter((f) => /\.pdf$/i.test(f.name));
+    const zuGross = pdfs.filter((f) => f.size > FEEDBACK_MAX_MB * 1024 * 1024);
+    if (zuGross.length > 0) alert(`Zu grouss (max. ${FEEDBACK_MAX_MB} MB pro Datei): ` + zuGross.map((f) => f.name).join(", "));
+    const ok = pdfs.filter((f) => f.size <= FEEDBACK_MAX_MB * 1024 * 1024);
+    setFeedbackDateien((alt) => [...alt, ...ok]);
+  };
+  const feedbackDateiZuBase64 = (datei) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(datei);
+  });
+  const feedbackEropLueden = async () => {
+    if (!feedbackModal || feedbackDateien.length === 0) return;
+    const { schueler, klasse } = feedbackModal;
+    setFeedbackSenden(true);
+    const fehler = [];
+    for (const d of feedbackDateien) {
+      try {
+        const inhaltBase64 = await feedbackDateiZuBase64(d);
+        const res = await fetch(WEB_APP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ typ: "plangFeedbackPdfHinzefuegen", token: window.PPREN_SESSION?.token || "", schueler, klasse, dateiName: d.name, inhaltBase64 }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      } catch (e) {
+        fehler.push(d.name + ": " + e.message);
+      }
+    }
+    setFeedbackSenden(false);
+    setFeedbackDateien([]);
+    lade();
+    if (fehler.length > 0) alert("Net all Dateien konnten erop geluede ginn:\n" + fehler.join("\n"));
+  };
+  const feedbackLoeschen = async (f) => {
+    if (!window.confirm(`Feedback-PDF "${f.Dateiname}" wierklech ewechhuelen? (Datei geet an de Drive-Pabeierkuerf.)`)) return;
+    setFeedbackLoeschId(f.ID);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ typ: "plangFeedbackPdfLoeschen", token: window.PPREN_SESSION?.token || "", id: f.ID }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      setPlangFeedbackPdfs((l) => l.filter((x) => x.ID !== f.ID));
+    } catch (e) {
+      alert("Konnt d'PDF net ewechhuelen: " + e.message);
+    } finally {
+      setFeedbackLoeschId(null);
+    }
+  };
 
   const ausgiFuer = (schueler) => ausgaben.filter((a) => a.Schüler === schueler).reduce((s, a) => s + (Number(a.Betrag) || 0), 0);
 
@@ -293,6 +373,7 @@ function App() {
               {gefiltert.map((p, i) => {
                 const meta = statusMeta(p.Status);
                 const ks = kommentarerFuer(p.Schüler);
+                const fbn = feedbackFuer(p.Schüler).length;
                 const oppen = ks.filter((k) => k.Erledegt !== "Jo").length;
                 const expanded = expandedSchueler === p.Schüler;
                 return (
@@ -335,6 +416,9 @@ function App() {
                           )}
                           <button type="button" className="btn-gen" onClick={() => oeffneKommentarModal(p.Schüler, p.Klasse, "add")} title="Kommentar derbäisetzen">
                             💬 +
+                          </button>
+                          <button type="button" className="btn-gen" onClick={() => oeffneFeedbackModal(p.Schüler, p.Klasse)} title="Feedback als PDF eroplueden">
+                            📄 PDF{fbn > 0 ? ` (${fbn})` : ""}
                           </button>
                         </div>
                       </td>
@@ -538,6 +622,68 @@ function App() {
           </div>
         </div>
       )}
+
+      {feedbackModal && (
+        <div className="modal-overlay" onClick={schliesFeedbackModal}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3>Feedback-PDF fir "{ufweis(feedbackModal.schueler)}"</h3>
+            <p className="modal-hint">
+              De Schüler gesäit d'PDF an sengem Projektplang-Formulaire a kann se erofluede. Nëmmen PDF, max. {FEEDBACK_MAX_MB} MB pro Datei.
+            </p>
+            {feedbackFuer(feedbackModal.schueler).length > 0 && (
+              <ul className="fb-liste">
+                {feedbackFuer(feedbackModal.schueler).map((f) => (
+                  <li key={f.ID}>
+                    <a className="link" href={f.Link} target="_blank" rel="noreferrer">📄 {f.Dateiname}</a>
+                    <span className="fb-meta">{f.VunProf} · {f.Erstallt}</span>
+                    <button type="button" className="datei-weg" disabled={feedbackLoeschId === f.ID} onClick={() => feedbackLoeschen(f)} title="Ewechhuelen">
+                      {feedbackLoeschId === f.ID ? "…" : "🗑️"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div
+              className={`dropzone${feedbackDragOver ? " dropzone-aktiv" : ""}`}
+              onDragOver={(e) => { e.preventDefault(); setFeedbackDragOver(true); }}
+              onDragLeave={() => setFeedbackDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setFeedbackDragOver(false); feedbackDateienBeifuegen(e.dataTransfer.files); }}
+              onClick={() => document.getElementById("feedback-pdf-input").click()}
+            >
+              📎 PDF hei dropen oder klicken zum Auswielen
+              <input
+                id="feedback-pdf-input"
+                type="file"
+                multiple
+                accept="application/pdf,.pdf"
+                style={{ display: "none" }}
+                onChange={(e) => { feedbackDateienBeifuegen(e.target.files); e.target.value = ""; }}
+              />
+            </div>
+            {feedbackDateien.length > 0 && (
+              <ul className="extern-datei-liste">
+                {feedbackDateien.map((d, i) => (
+                  <li key={i}>
+                    <span>{d.name} ({Math.round(d.size / 1024)} KB)</span>
+                    <button type="button" className="datei-weg" disabled={feedbackSenden} onClick={() => setFeedbackDateien((l) => l.filter((_, j) => j !== i))}>✕</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="btn-gen" onClick={schliesFeedbackModal} disabled={feedbackSenden}>Zoumaachen</button>
+              <button
+                type="button"
+                className="btn-gen btn-gen-primary"
+                onClick={feedbackEropLueden}
+                disabled={feedbackSenden || feedbackDateien.length === 0}
+              >
+                {feedbackSenden ? "Lued erop…" : `📤 Eroplueden${feedbackDateien.length > 0 ? ` (${feedbackDateien.length})` : ""}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -605,6 +751,15 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .modal-box h3 { margin: 0 0 8px; font-size: 16px; color: #1c2621; }
 .modal-hint { margin: 0 0 12px; font-size: 12.5px; color: #6d7d74; line-height: 1.4; }
 .modal-textarea { width: 100%; min-height: 180px; border: 1px solid #c9d5cd; border-radius: 8px; padding: 10px 12px; font-size: 14px; font-family: inherit; resize: vertical; box-sizing: border-box; }
+.dropzone { border: 2px dashed #9db6a7; border-radius: 10px; padding: 18px 12px; text-align: center; font-size: 13px; font-weight: 600; color: #55625a; background: #fafbfa; cursor: pointer; }
+.dropzone-aktiv { border-color: #00A94F; background: #eaf7ef; color: #00733a; }
+.extern-datei-liste { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.extern-datei-liste li { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; font-weight: 600; background: #eef3ef; padding: 5px 10px; border-radius: 6px; }
+.datei-weg { border: none; background: transparent; color: #99392f; cursor: pointer; font-size: 13px; }
+.fb-liste { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.fb-liste li { display: flex; align-items: center; gap: 10px; font-size: 12.5px; background: #fffaf0; border: 1px solid #f0d29a; padding: 6px 10px; border-radius: 8px; }
+.fb-liste .link { flex: 1 1 auto; word-break: break-all; }
+.fb-meta { font-size: 11px; color: #6d7d74; white-space: nowrap; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
 .btn-gen-primary { color: #fff; background: #00A94F; border-color: #00A94F; }
 .btn-gen-primary:disabled { opacity: 0.5; cursor: not-allowed; }
