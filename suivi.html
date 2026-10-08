@@ -927,7 +927,7 @@ function App() {
                 const gruppe = teile[0];
                 const pos = teile.slice(1).join(" — ") || k.name;
                 if (!gruppiert[gruppe]) gruppiert[gruppe] = [];
-                gruppiert[gruppe].push({ name: pos, punkte: k.punkte, max: k.max });
+                gruppiert[gruppe].push({ name: pos, punkte: k.punkte, max: k.max, detail: k.detail });
               });
 
               return (
@@ -1001,7 +1001,14 @@ function App() {
                             <Fortschrittsbar prozent={gProzent} farbe="#4576B5" />
                             <ul className="positionen-liste">
                               {items.map((i, idx) => (
-                                <li key={idx}>{i.name}: <strong>{i.punkte} / {i.max}</strong></li>
+                                <li key={idx}>
+                                  {i.name}: <strong>{i.punkte} / {i.max}</strong>
+                                  {Array.isArray(i.detail) && i.detail.length > 0 && (
+                                    <ul className="detail-liste">
+                                      {i.detail.map((d) => <li key={d.name}>{d.name}: {d.punkte} / {d.max}</li>)}
+                                    </ul>
+                                  )}
+                                </li>
                               ))}
                             </ul>
                             {gBem && (gBem.positiv || []).map((r) => (
@@ -1081,6 +1088,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .btn-ghost { background: #eef3ef; color: #00A94F; }
 .btn-ghost:disabled { opacity: 0.6; cursor: wait; }
 .raster-leer { margin-top: 14px; }
+.detail-liste { margin: 3px 0 2px; padding-left: 16px; font-size: 12.5px; color: #55625a; list-style: "– "; }
 .raster-indikatoren { display: block; font-size: 11.5px; color: #6d7d74; margin-top: 2px; }
 .notice { background: #fbe8c6; color: #8a5a12; font-size: 13px; padding: 12px 14px; border-radius: 8px; line-height: 1.5; margin: 0; }
 .empty { padding: 30px; text-align: center; color: #6d7d74; font-size: 14px; background: #fff; border-radius: 12px; border: 1px solid #e2e8e3; }

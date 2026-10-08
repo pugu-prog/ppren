@@ -330,13 +330,26 @@ function bauStrukturVunRaster(raster) {
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+/* Detail vum Projektplang (/30) no dem Bewäertungsraster — fir datt fir jiddereen
+   (Prof, Kolleegen, Schüler) kloer ass, wéi d'30 Punkten zustane kommen. */
+const PROJEKTPLAN_DETAIL = [
+  { key: "beschreibung", name: "Beschreibung des Projektes", max: 15 },
+  { key: "motivation", name: "Motivation (Bezug zu Umweltwissenschaften)", max: 3 },
+  { key: "ziele", name: "Ziele des Projektes", max: 6 },
+  { key: "aufgaben", name: "Aufgaben / Aufgabenteilung", max: 6 },
+];
+const hatProjektplanDetail = (item) => item.name === "Projektplan" && Number(item.max) === 30;
+
 function initKategorien(struktur, periode) {
   const def = struktur[periode];
   if (!def) return [];
   const flat = [];
   def.gruppen.forEach((g) => {
     g.items.forEach((item) => {
-      flat.push({ id: uid(), gruppe: g.titel, name: item.name, max: item.max, indikatoren: item.indikatoren, punkte: "" });
+      flat.push({
+        id: uid(), gruppe: g.titel, name: item.name, max: item.max, indikatoren: item.indikatoren, punkte: "",
+        ...(hatProjektplanDetail(item) ? { detail: { beschreibung: "", motivation: "", ziele: "", aufgaben: "" } } : {}),
+      });
     });
   });
   return flat;
@@ -525,15 +538,20 @@ function App() {
           const lescht = kiData.ok && (kiData.historique || [])[0];
           if (lescht) {
             const fl = lescht.resultat?.fuer_lehrer || {};
-            let gesamt = null;
+            let punkte = null;
             if (fl.raster_punkte) {
-              const rp = fl.raster_punkte;
-              gesamt = (Number(rp.beschreibung) || 0) + (Number(rp.motivation) || 0) + (Number(rp.ziele) || 0) + (Number(rp.aufgaben) || 0);
+              punkte = fl.raster_punkte;
             } else if (fl.raster_schaetzung) {
-              const treffer = [...String(fl.raster_schaetzung).matchAll(/(\d+(?:[.,]\d+)?)\s*\/\s*(\d+)/g)].slice(0, 4);
-              if (treffer.length > 0) gesamt = treffer.reduce((sum, m) => sum + parseFloat(m[1].replace(",", ".")), 0);
+              const txt = String(fl.raster_schaetzung);
+              const hol = (wuert) => {
+                const m = txt.match(new RegExp(wuert + "[^0-9]{0,25}(\\d+(?:[.,]\\d+)?)\\s*\\/", "i"));
+                return m ? parseFloat(m[1].replace(",", ".")) : null;
+              };
+              const geholt = { beschreibung: hol("Beschreib"), motivation: hol("Motivation"), ziele: hol("Ziel"), aufgaben: hol("Aufgab") };
+              if (Object.values(geholt).some((v) => v != null)) punkte = geholt;
             }
-            setKiPlangInfo({ gesamt, detail: fl.raster_schaetzung || "", datum: lescht.erstallt, planStand: lescht.planStand });
+            const gesamt = punkte ? PROJEKTPLAN_DETAIL.reduce((s2, x) => s2 + (Number(punkte[x.key]) || 0), 0) : null;
+            setKiPlangInfo({ gesamt, punkte, detail: fl.raster_schaetzung || "", datum: lescht.erstallt, planStand: lescht.planStand });
           }
         } catch (e) { /* KI-Virschlag ass optional */ }
       }
@@ -560,6 +578,27 @@ function App() {
     if (zahl < 0) return "0";
     if (zahl > max) return String(max);
     return wert;
+  };
+
+  const updateDetail = (id, key, wert) =>
+    setKategorien((ks) => ks.map((k) => {
+      if (k.id !== id || !k.detail) return k;
+      const d = PROJEKTPLAN_DETAIL.find((x) => x.key === key);
+      const detail = { ...k.detail, [key]: begrenzeAufMax(wert, d.max) };
+      const alleLeer = PROJEKTPLAN_DETAIL.every((x) => detail[x.key] === "");
+      const summe = PROJEKTPLAN_DETAIL.reduce((s2, x) => s2 + (parseFloat(detail[x.key]) || 0), 0);
+      return { ...k, detail, punkte: alleLeer ? "" : String(summe) };
+    }));
+  const kiAschaetzungIwwerhuelen = () => {
+    const rp = kiPlangInfo?.punkte;
+    if (!rp) return;
+    setKategorien((ks) => ks.map((k) => {
+      if (!k.detail) return k;
+      const detail = {};
+      PROJEKTPLAN_DETAIL.forEach((x) => { detail[x.key] = rp[x.key] == null ? "" : String(Math.min(x.max, Math.max(0, Number(rp[x.key]) || 0))); });
+      const summe = PROJEKTPLAN_DETAIL.reduce((s2, x) => s2 + (parseFloat(detail[x.key]) || 0), 0);
+      return { ...k, detail, punkte: String(summe) };
+    }));
   };
 
   const updateKategorie = (id, punkte, max) =>
@@ -671,7 +710,10 @@ function App() {
         schueler: currentSchueler.name,
         klasse: currentSchueler.klasse,
         periode,
-        kategorien: kategorien.map((k) => ({ name: `${k.gruppe} — ${k.name}`, punkte: Number(k.punkte) || 0, max: k.max })),
+        kategorien: kategorien.map((k) => ({
+          name: `${k.gruppe} — ${k.name}`, punkte: Number(k.punkte) || 0, max: k.max,
+          ...(k.detail ? { detail: PROJEKTPLAN_DETAIL.map((d) => ({ name: d.name, punkte: Number(k.detail[d.key]) || 0, max: d.max })) } : {}),
+        })),
         gruppenBemerkungen,
         allgemeinPositiv: allgemeinPositivListe,
         allgemeinNegativ: allgemeinNegativListe,
@@ -795,26 +837,24 @@ function App() {
                     <p className="notice">ℹ️ Nach keng Ziel-Iwwerpréiwung fir dës Period gespäichert — manuell aginn oder éischt am Ziler-iwwerpréiwen-Tool ausfëlen.</p>
                   )}
 
-                  {(gruppiert[g.titel] || []).some((k) => k.name === "Projektplan") && (
-                    kiPlangInfo ? (
+                  {(gruppiert[g.titel] || []).some((k) => k.name === "Projektplan") && kiPlangInfo && (
+                    <details className="ki-details">
+                      <summary>KI-Aschätzung uweisen</summary>
                       <div className="notice notice-ki">
-                        🤖 <b>KI-Virschlag Projektplang{kiPlangInfo.gesamt != null ? `: ${kiPlangInfo.gesamt} / 30` : ""}</b>
-                        {" "}(Entworf vum {kiPlangInfo.datum}{kiPlangInfo.planStand ? `, Plang-Stand ${kiPlangInfo.planStand}` : ""})
+                        <b>KI-Aschätzung als Hëllef – d'Bewäertung mécht d'Léierpersonal.</b>
+                        <div className="ki-detail">
+                          Entworf vum {kiPlangInfo.datum}{kiPlangInfo.planStand ? `, Plang-Stand ${kiPlangInfo.planStand}` : ""}
+                          {kiPlangInfo.gesamt != null ? ` · Total ${kiPlangInfo.gesamt} / 30` : ""}
+                        </div>
                         {kiPlangInfo.detail && <div className="ki-detail">{kiPlangInfo.detail}</div>}
                         <div className="ki-aktiounen">
-                          {kiPlangInfo.gesamt != null && (
-                            <button
-                              type="button" className="btn-gen"
-                              onClick={() => setKategorien((ks) => ks.map((k) => (k.name === "Projektplan" ? { ...k, punkte: String(Math.min(k.max, Math.round(kiPlangInfo.gesamt * 2) / 2)) } : k)))}
-                            >↓ {kiPlangInfo.gesamt} P iwwerhuelen</button>
+                          {kiPlangInfo.punkte && (
+                            <button type="button" className="btn-gen" onClick={kiAschaetzungIwwerhuelen}>↓ An d'Felder iwwerhuelen (duerno upassen)</button>
                           )}
                           <a className="btn-gen" href="dashboard.html" target="_blank">🧪 Plang-Check →</a>
                         </div>
-                        <div className="ki-hiweis">Just e Virschlag — d'Note decidéiers du.</div>
                       </div>
-                    ) : (
-                      <p className="notice">ℹ️ Nach kee KI-Entworf fir dëse Projektplang — am Dashboard iwwer „🧪 Plang-Check → 🤖 KI-Entworf“ maachen (optional).</p>
-                    )
+                    </details>
                   )}
 
                   {(gruppiert[g.titel] || []).map((k) => (
@@ -822,12 +862,28 @@ function App() {
                       <div className="kat-row">
                         <span className="kat-name">{k.name}</span>
                         <input
-                          type="number" min="0" max={k.max} className="input input-points"
-                          value={k.punkte} onChange={(e) => updateKategorie(k.id, e.target.value, k.max)}
+                          type="number" min="0" max={k.max} className={`input input-points${k.detail ? " input-summe" : ""}`}
+                          value={k.punkte} readOnly={!!k.detail} title={k.detail ? "Gëtt aus den Deeler hei drënner gerechent" : undefined}
+                          onChange={(e) => updateKategorie(k.id, e.target.value, k.max)}
                         />
                         <span className="kat-max">/ {k.max}</span>
                       </div>
-                      {k.indikatoren && <div className="indikatoren">{k.indikatoren}</div>}
+                      {k.detail && (
+                        <div className="detail-liste">
+                          {PROJEKTPLAN_DETAIL.map((d) => (
+                            <div className="detail-row" key={d.key}>
+                              <span className="detail-name">{d.name}</span>
+                              <input
+                                type="number" min="0" max={d.max} step="0.5" className="input input-points input-detail"
+                                value={k.detail[d.key]} onChange={(e) => updateDetail(k.id, d.key, e.target.value)}
+                              />
+                              <span className="kat-max">/ {d.max}</span>
+                            </div>
+                          ))}
+                          <div className="detail-hiweis">Kostenplan: falls erforderlich, ohne eigene Punkte.</div>
+                        </div>
+                      )}
+                      {k.indikatoren && !k.detail && <div className="indikatoren">{k.indikatoren}</div>}
                     </div>
                   ))}
 
@@ -974,6 +1030,17 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .brand-mark { font-weight: 800; font-size: 15px; letter-spacing: 0.06em; }
 .brand-sub { font-size: 13px; opacity: 0.85; }
 .content { max-width: 720px; margin: 0 auto; padding: 24px 20px 60px; }
+.ki-details { margin: 8px 0 0; }
+.ki-details > summary { cursor: pointer; font-size: 11.5px; color: #93a098; list-style: none; user-select: none; }
+.ki-details > summary::before { content: "▸ "; }
+.ki-details[open] > summary::before { content: "▾ "; }
+.ki-details > summary::-webkit-details-marker { display: none; }
+.detail-liste { margin: 6px 0 4px 14px; padding-left: 10px; border-left: 2px solid #dbe4de; }
+.detail-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.detail-name { flex: 1; font-size: 12.5px; color: #55625a; }
+.input-detail { width: 64px; }
+.input-summe { background: #eef3ef; font-weight: 700; }
+.detail-hiweis { font-size: 11px; color: #93a098; margin-top: 2px; }
 .ki-detail { font-size: 12px; color: #6b5420; margin-top: 4px; }
 .ki-aktiounen { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .ki-hiweis { font-size: 11px; color: #8a7a55; margin-top: 6px; }
