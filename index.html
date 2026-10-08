@@ -117,7 +117,7 @@ function App() {
     }
     // Fir de Fall, wou d'Sendung um Server net duerchgaangen ass, mä de
     // Plang trotzdem lokal um Status "Eingereicht"/"Freigegeben" bleift a
-    // sech dofir net méi ännere léisst: setzt just DE STATUS vum aktuell
+    // sech dofir net méi änneren léisst: setzt just DE STATUS vum aktuell
     // ugemellte Schüler zréck op "Entwurf", ouni seng agedroe Donnéeën
     // unzeréieren. Opruff: index.html?reopen=mir
     if (params.get("reopen") === "mir") {
@@ -336,7 +336,7 @@ function App() {
       // Den Status gëtt bewosst eréischt HEI, no engem erfollegräichen
       // Backend-Send, geännert — sou kann d'Formulaire nëmmen dann gespaart
       // ginn, wann de Plang wierklech beim Prof ukomm ass. Feelt de Send,
-      // bleift alles um Status "Entwurf" a bleift edittéierbar.
+      // bleift alles um Status "Entwurf" a bleift editéierbar.
       update({ status });
       setDocUrl(resultat.url);
       setDocPdfUrl(resultat.pdfUrl || null);
@@ -613,7 +613,7 @@ function App() {
                         {budgetUeberschritten && <span className="over-label">Budget überschritten</span>}
                       </div>
                       <p className="field-hint" style={{ marginTop: "8px" }}>
-                        💡 Dëse Kostenplang ass nëmmen eng Plangung. Fir tatsächlech Ausgaben anzedroen (nodeems den Prof de Kostenplang genehmegt huet), benotz d'<a href="budget.html">Budget-Tool</a>.
+                        💡 Dëse Kostenplang ass nëmmen eng Plangung. Fir tatsächlech Ausgaben anzedroen (nodeem den Prof de Kostenplang genehmegt huet), benotz d'<a href="budget.html">Budget-Tool</a>.
                       </p>
                     </div>
                   )}
@@ -643,7 +643,7 @@ function App() {
               </div>
               {!locked && plan.status === "Entwurf" && (
                 <p className="field-hint" style={{ margin: "-6px 0 14px" }}>
-                  💾 <strong>Späicheren</strong> synchroniséiert de Plang mat Google Drive (den Betreier kann en dann nokucken), bleift awer op „Entwurf" — du kanns nach weiderschaffen. <strong>„Zur Genehmigung einreichen"</strong> spaart de Plang fir de Betreier a gëtt gespaart, bis en en nees op mécht.
+                  💾 <strong>Späicheren</strong> synchroniséiert de Plang mat Google Drive (den Betreier kann en dann nokucken), bleift awer op „Entwurf" — du kanns nach weiderschaffen. <strong>„Zur Genehmigung einreichen"</strong> spaart de Plang fir de Betreier a gëtt gespaart, bis en en nees opmécht.
                 </p>
               )}
               {syncError && <div className="sync-error">{syncError}</div>}
