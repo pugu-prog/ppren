@@ -2,7 +2,7 @@
  * PPREN Auth-Guard
  * ----------------
  * Op JIDDER geschützter Säit als éischt Script agebonnen (virun de React-Scripten).
- * Préift ob eng gëlteg Session existéiert; wa net, gëtt direkt op login.html
+ * Préift ob eng gëlteg Session existpéiert; wa net, gëtt direkt op login.html
  * geleet (mat "zréck"-Parameter, fir nom Umellen hei zréckzekommen).
  *
  * Setzt global "PPREN_SESSION" = { token, numm, rolle, klasse } zur Verfügung,
@@ -70,13 +70,13 @@
     });
   };
 
-  // Klengt Ofmell-Knäppchen a "Zréck zur Haaptsäit"-Link um Rand vun der Säit
+  // Klengt Ofmell-Knäppchen a "Zréck zur Haapsäit"-Link um Rand vun der Säit
   // derbäisetzen, sou datt béid automatesch iwwerall do sinn, ouni all Säit
   // enzeel upassen ze mussen. "links.html" routt sech selwer weider op
   // proffen.html/schueler.html, jee no Roll.
   function fügOfmellKnäppchenBäi() {
     const startLink = document.createElement("a");
-    startLink.textContent = "🏠 Haaptsäit";
+    startLink.textContent = "🏠 Haapsäit";
     startLink.href = "links.html";
     startLink.style.cssText = [
       "position:fixed", "bottom:12px", "left:12px", "z-index:9999",
@@ -112,11 +112,137 @@
   }
   fügOfmellKnäppchenBäi();
 
+  // Glack 🔔 (NËMMEN Proffen): zeigt Meldungen aus dem Backend (z.B. geplangt Rendez-vousen,
+  // Erënnerungen) mat Zuel vun den neien. Hänkt sech selwer op all Prof-Säit, ouni dass
+  // eng Säit enzel ugepasst muss ginn. Fehler hei blockpéieren ni d'Säit.
+  function fügGlackBäi() {
+    if (rolle !== "Prof") return;
+    const API = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
+    const FONT = "font-family:-apple-system,'Segoe UI',Inter,Arial,sans-serif";
+    let meldungen = [];
+    let panelOffen = false;
+
+    const knapp = document.createElement("button");
+    knapp.setAttribute("type", "button");
+    knapp.title = "Meldungen";
+    knapp.style.cssText = [
+      "position:fixed", "bottom:52px", "right:12px", "z-index:9999",
+      "background:#fff", "color:#1c2621", "border:1px solid #c9d5cd", "border-radius:20px",
+      "padding:7px 13px", "font-size:15px", FONT, "cursor:pointer",
+      "box-shadow:0 2px 8px rgba(0,0,0,0.25)",
+    ].join(";");
+    const zeechen = document.createElement("span");
+    zeechen.style.cssText = "display:none;position:absolute;top:-7px;right:-7px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#c0392b;color:#fff;font-size:11px;font-weight:800;line-height:19px;text-align:center;" + FONT;
+    const knappText = document.createElement("span");
+    knappText.textContent = "🔔";
+    knapp.appendChild(knappText);
+    knapp.appendChild(zeechen);
+
+    const panel = document.createElement("div");
+    panel.style.cssText = [
+      "position:fixed", "bottom:96px", "right:12px", "z-index:9999", "display:none",
+      "width:min(440px,92vw)", "max-height:62vh", "overflow-y:auto", "background:#fff",
+      "border:1px solid #c9d5cd", "border-radius:12px", "padding:12px 14px",
+      "box-shadow:0 8px 30px rgba(0,0,0,0.3)", FONT, "font-size:13px", "color:#1c2621",
+    ].join(";");
+
+    const ungelies = () => meldungen.filter((m) => !m.gelies).length;
+    const el = (tag, css, text) => {
+      const x = document.createElement(tag);
+      if (css) x.style.cssText = css;
+      if (text !== undefined) x.textContent = text;
+      return x;
+    };
+
+    function zeechnen() {
+      const n = ungelies();
+      zeechen.textContent = String(n);
+      zeechen.style.display = n > 0 ? "block" : "none";
+      panel.textContent = "";
+      const kapp = el("div", "display:flex;justify-content:space-between;align-items:center;margin-bottom:8px");
+      kapp.appendChild(el("strong", "font-size:14px", "🔔 Meldungen" + (n > 0 ? " (" + n + " nei)" : "")));
+      if (n > 0) {
+        const alle = el("button", "border:1px solid #c9d5cd;background:#eef3ef;color:#00A94F;font-size:11px;font-weight:700;padding:4px 9px;border-radius:7px;cursor:pointer", "✓ Alles gelies");
+        alle.setAttribute("type", "button");
+        alle.onclick = () => markGelies(null);
+        kapp.appendChild(alle);
+      }
+      panel.appendChild(kapp);
+      if (meldungen.length === 0) {
+        panel.appendChild(el("div", "color:#6d7d74;font-size:12.5px;padding:8px 0", "Nach keng Meldungen."));
+        return;
+      }
+      meldungen.forEach((m) => {
+        const box = el("div", "border:1px solid #e2e8e3;border-left:4px solid " + (m.gelies ? "#c9d5cd" : "#c0392b") + ";border-radius:8px;padding:8px 10px;margin-bottom:8px;background:" + (m.gelies ? "#fff" : "#fffaf0"));
+        const zeil = el("div", "display:flex;justify-content:space-between;gap:8px;align-items:baseline");
+        zeil.appendChild(el("strong", "font-size:12.5px", m.Titel));
+        zeil.appendChild(el("span", "font-size:10.5px;color:#6d7d74;white-space:nowrap", m.Zait));
+        box.appendChild(zeil);
+        box.appendChild(el("div", "font-size:12px;line-height:1.5;white-space:pre-wrap;margin:5px 0;color:#1c2621", m.Text));
+        const akt = el("div", "display:flex;gap:12px;align-items:center");
+        if (m.Link) {
+          const a = el("a", "color:#00A94F;font-weight:700;text-decoration:none;font-size:12px", "Opmaachen ↗");
+          a.href = m.Link;
+          akt.appendChild(a);
+        }
+        if (!m.gelies) {
+          const g = el("button", "border:1px solid #c9d5cd;background:#eef3ef;color:#00A94F;font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;cursor:pointer", "✓ Gelies");
+          g.setAttribute("type", "button");
+          g.onclick = () => markGelies(m.ID);
+          akt.appendChild(g);
+        }
+        box.appendChild(akt);
+        panel.appendChild(box);
+      });
+    }
+
+    function markGelies(id) {
+      meldungen = meldungen.map((m) => (id === null || m.ID === id ? Object.assign({}, m, { gelies: true }) : m));
+      zeechnen();
+      fetch(API, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(Object.assign({ typ: "notifikatiounGelies", token }, id === null ? { alle: true } : { id })),
+      }).catch(() => {});
+    }
+
+    function lueden() {
+      fetch(API + "?notifikatiounen=1&token=" + encodeURIComponent(token))
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.ok) { meldungen = data.notifikatiounen || []; zeechnen(); }
+        })
+        .catch(() => {});
+    }
+
+    knapp.onclick = () => {
+      panelOffen = !panelOffen;
+      panel.style.display = panelOffen ? "block" : "none";
+      if (panelOffen) lueden();
+    };
+
+    let bäigesat = false;
+    const bäisetzen = () => {
+      if (bäigesat || !document.body) return;
+      bäigesat = true;
+      document.body.appendChild(panel);
+      document.body.appendChild(knapp);
+      zeechnen();
+      lueden();
+      setInterval(lueden, 5 * 60 * 1000);
+    };
+    document.addEventListener("DOMContentLoaded", bäisetzen);
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+      setTimeout(bäisetzen, 0);
+    }
+  }
+  try { fügGlackBäi(); } catch (e) { /* d'Glack däerf ni d'Säit oder d'Session-Kontroll blockpéieren */ }
+
   // Session am Hannergrond validéieren (ofgelaf Sessioune erausfannen), ouni
-  // d'Säit ze blockéieren — bei Ongëltegkeet gëtt sanft op login.html geleet.
+  // d'Säit ze blockpéieren — bei Ongëltegkeet gëtt sanft op login.html geleet.
   // De Server ass déi eenzeg authoritativ Quell fir d'Roll: den initialen Check
   // hei driwwer baséiert nëmmen op localStorage, dat kann ëmgeängt ginn (z.B. iwwer
-  // DevTools). Dofir gëtt d'Roll hei mat der Server-Äntwert ofgeglach a lokal
+  // DevTools). Dofir gëtt d'Roll hei mat der Server-Äntwert ofgegläch a lokal
   // korrigéiert/geläscht, wann se net iwwerteneestëmmen.
   const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
   fetch(WEB_APP_URL, {
@@ -153,5 +279,5 @@
         localStorage.setItem("ppren_klasse", data.klasse || "");
       }
     })
-    .catch(() => {}); // Bei Netzwerkfehler: Säit bleift nutzbar, näischt blockéieren
+    .catch(() => {}); // Bei Netzwerkfehler: Säit bleift nutzbar, näischt blockpéieren
 })();
