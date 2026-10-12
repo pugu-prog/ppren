@@ -70,6 +70,13 @@ function ersteDatumVunWoche(wocheLabel) {
   return new Date(`${m[3]}-${m[2]}-${m[1]}`);
 }
 
+/** True, wann d'Frist (Sonndes 22:00) vun där Woch (Label "dd.mm.yyyy – dd.mm.yyyy") scho laanscht ass. */
+function wocheFristEriwwer(wocheLabel) {
+  const m = String(wocheLabel || "").match(/– (\d{2})\.(\d{2})\.(\d{4})/);
+  if (!m) return false;
+  return new Date() > new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 22, 0, 0);
+}
+
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
 function dateiZuBase64(datei) {
@@ -186,6 +193,8 @@ function App() {
   // verstoppt, well si nach näischt ofginn dierfen.
   const previewOnlyVirStart = nachVirStart && !istSchueler;
   const blockedByStart = nachVirStart && istSchueler;
+  // Nom Ofgabetermin (Sonndes 22:00) kann de Schüler säi Bericht net méi änneren (de Prof schonn).
+  const fristZu = (label) => istSchueler && wocheFristEriwwer(label);
 
   const lade = () => {
     if (!currentSchueler) return;
@@ -239,7 +248,8 @@ function App() {
   const bestehendFuerWoche = periode
     ? meng.find((w) => w.Periode === periode && w.Woche === bericht.woche && w.ID !== bericht.id)
     : null;
-  const wocheGespaart = bestehendFuerWoche && bestehendFuerWoche.Status === "Bewäert";
+  const wocheBewaert = !!bestehendFuerWoche && bestehendFuerWoche.Status === "Bewäert";
+  const wocheGespaart = !!bestehendFuerWoche && (wocheBewaert || (bestehendFuerWoche.Status !== "Verpasst" && fristZu(bericht.woche)));
 
   const canSubmit = periode && bericht.zusammenfassung.trim() && bericht.fortschritt.trim() && !wocheGespaart && !previewOnlyVirStart;
 
@@ -291,6 +301,7 @@ function App() {
   };
 
   const bearbechten = (w) => {
+    if (fristZu(w.Woche)) return;
     setBericht({
       id: w.ID,
       woche: w.Woche,
@@ -409,8 +420,11 @@ function App() {
         {schuelerId && periode && !blockedByStart && wocheGespaart && (
           <div className="card">
             <p className="notice">
-              🔒 Fir dës Woch ({bericht.woche}) hues du schonn en Bericht ofginn, deen och scho <strong>bewäert</strong> ass —
-              dës Woch ass gespaart. En neie Bericht kann eréischt d'nächst Woch ofginn ginn.
+              {wocheBewaert
+                ? <>🔒 Fir dës Woch ({bericht.woche}) hues du schonn en Bericht ofginn, deen och scho <strong>bewäert</strong> ass —
+                    dës Woch ass gespaart. En neie Bericht kann eréischt d'nächst Woch ofginn ginn.</>
+                : <>🔒 Fir dës Woch ({bericht.woche}) hues du schonn en Bericht ofginn an d'<strong>Frist ass eriwwer</strong> (Sonndes 22:00) —
+                    en kann net méi geännert ginn.</>}
             </p>
           </div>
         )}
@@ -511,6 +525,7 @@ function App() {
 
             <section className="card">
               <h2>Meng Berichter — {periode}</h2>
+              <p className="hint-klengt">🔒 Nom Ofgabetermin (Sonndes 22:00) kann e Bericht net méi geännert ginn.</p>
               {loading && <p className="notice">Lädt…</p>}
               {!loading && meng.filter((w) => w.Periode === periode).length === 0 && (
                 <p className="notice">Nach kee Bericht fir dës Period ofginn.</p>
@@ -533,7 +548,9 @@ function App() {
                           <td className="cell-muted">{w.Meilensteen || "–"}</td>
                           <td><span className={`pill ${w.Status === "Bewäert" ? "pill-done" : "pill-pending"}`}>{w.Status}</span></td>
                           <td>{summe !== null ? `${summe} / 5` : "–"}</td>
-                          <td>{w.Status !== "Bewäert" && <button className="btn-gen" onClick={() => bearbechten(w)}>Änneren</button>}</td>
+                          <td>{w.Status !== "Bewäert" && (fristZu(w.Woche)
+                            ? <span className="cell-muted" title="Frist eriwwer — net méi ännerbar">🔒</span>
+                            : <button className="btn-gen" onClick={() => bearbechten(w)}>Änneren</button>)}</td>
                         </tr>
                         {w.Kommentar && (
                           <tr>
