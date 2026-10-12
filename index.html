@@ -98,6 +98,31 @@ function useDebouncedSave(key, value, delay = 700) {
   return saving;
 }
 
+// Zäitstempel (Server: "dd.MM.yyyy HH:mm" oder ISO) -> Millisekonnen
+function zeitVunServer(wert) {
+  if (!wert) return 0;
+  const t = String(wert);
+  const m = t.match(/(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)).getTime();
+  const d = Date.parse(t);
+  return isNaN(d) ? 0 : d;
+}
+
+// Entscheet, wat mam Server-Stand geschitt, wann um Gerät schonn en lokalen Entworf ass:
+//  "nichts"  -> Server net méi nei wéi dee, mat deem dat Gerät zeletzt synchron war
+//  "gleich"  -> Server méi nei, awer Inhalt identesch (just Stand notéieren)
+//  "laden"   -> Server méi nei an hei gouf näischt Ongespäichert geännert -> roueg lueden
+//  "froen"   -> Server méi nei, awer hei ginn et ongespäichert Ännerungen (oder eeler Entworf ouni Marker)
+function serverStandEntscheedung(lokal, serverMs, gleichInhalt) {
+  if (!serverMs) return "nichts";
+  const sync = lokal.letzteSyncMs || 0;
+  if (serverMs <= sync + 120000) return "nichts"; // 2 Min. Toleranz fir Auer-Ënnerscheeder
+  if (gleichInhalt) return "gleich";
+  const ongespaichert = (lokal.lokalGeaendertMs || 0) > sync;
+  if (!lokal.letzteSyncMs || ongespaichert) return "froen";
+  return "laden";
+}
+
 const Field = ({ label, hint, children }) => (
   <label className="field">
     <span className="field-label">{label}</span>
@@ -117,7 +142,7 @@ function App() {
     }
     // Fir de Fall, wou d'Sendung um Server net duerchgaangen ass, mä de
     // Plang trotzdem lokal um Status "Eingereicht"/"Freigegeben" bleift a
-    // sech dofir net méi änneren léisst: setzt just DE STATUS vum aktuell
+    // sech dofir net méi ännere léisst: setzt just DE STATUS vum aktuell
     // ugemellte Schüler zréck op "Entwurf", ouni seng agedroe Donnéeën
     // unzeréieren. Opruff: index.html?reopen=mir
     if (params.get("reopen") === "mir") {
@@ -185,7 +210,11 @@ function App() {
   const [kommentarAendertId, setKommentarAendertId] = useState(null);
   const [serverSync, setServerSync] = useState(null);
   const [statusReopenedNotice, setStatusReopenedNotice] = useState(false);
+  const [serverStandText, setServerStandText] = useState("");
+  const [serverNeuHinweis, setServerNeuHinweis] = useState(false);
+  const planRef = useRef(null);
 
+  planRef.current = plan;
   const storageKey = schuelerId ? `projektplan:${schuelerId}` : null;
   const saving = useDebouncedSave(loaded ? storageKey : null, plan);
   const currentSchueler = SCHUELER.find((s) => s.id === schuelerId);
@@ -218,45 +247,73 @@ function App() {
         // lokale Entworf huet ëmmer Virrang, wann do schonn Inhalt ass.
         const projektZeil = (data.projekte || []).find((p) => p.Schüler === currentSchueler.name);
         if (projektZeil) {
-          setPlan((p) => {
-            const serverStatus = projektZeil.Status || p.status;
-            // De STATUS muss ëmmer vum Server kommen, och wann lokal Inhalt
-            // scho do ass: nëmmen de Server weess zouverléisseg, ob de Prof
-            // de Plang rem opgemaach ("Wiedereröffnen") oder fräigeschalt
-            // huet -- dat läit ausserhalb vun dësem Browser/Gerät. Ouni dëst
-            // blouf en op engem aneren Apparat rem opgemaachte Plang hei
-            // fälschlecherweis gespaart, well nëmmen den ale lokale Status
-            // benotzt gouf. (Feeler gemellt: "Projektplang net méi
-            // accessible obwuel rem opgemaach" — 2026-09-28.)
-            if (p.titel && p.titel.trim()) {
-              if (serverStatus === p.status) return p;
-              setServerSync(new Date());
-              if (serverStatus === "Entwurf" && p.status !== "Entwurf") setStatusReopenedNotice(true);
-              return { ...p, status: serverStatus };
-            }
-            let details = {};
-            try { details = JSON.parse(projektZeil["Projektplan-Details (JSON)"] || "{}"); } catch { details = {}; }
+          let details = {};
+          try { details = JSON.parse(projektZeil["Projektplan-Details (JSON)"] || "{}"); } catch { details = {}; }
+          const serverMs = zeitVunServer(projektZeil["Zuletzt aktualisiert"]);
+          setServerStandText(String(projektZeil["Zuletzt aktualisiert"] || ""));
+          const lokal = planRef.current || {};
+          const hatLokal = !!(lokal.titel && lokal.titel.trim());
+          const tt = (x) => String(x || "").trim();
+          const gleichInhalt = hatLokal && tt(lokal.titel) === tt(projektZeil.Titel) && tt(lokal.inhalt) === tt(details.inhalt)
+            && tt(lokal.motivation) === tt(details.motivation) && tt(lokal.ziele) === tt(details.ziele)
+            && tt(lokal.aufgabenteilung) === tt(details.aufgabenteilung);
+          const entscheedung = hatLokal ? serverStandEntscheedung(lokal, serverMs, gleichInhalt) : "laden";
+          let serverLaden = entscheedung === "laden";
+          if (entscheedung === "froen") {
+            serverLaden = window.confirm(
+              "Op engem anere Gerät gouf méi nei gespäichert (Server: " + (projektZeil["Zuletzt aktualisiert"] || "?") + "), " +
+              "an hei gëtt et ongespäichert Ännerungen.\n\n" +
+              "OK = Server-Stand lueden (déi lokal Ännerungen hei ginn ersat)\n" +
+              "Ofbriechen = hei weiderschaffen (e spéidert „Späicheren“ iwwerschreift dann den Server-Stand)"
+            );
+          }
+          const serverStatus = projektZeil.Status || lokal.status;
+          // De STATUS muss ëmmer vum Server kommen, och wann lokal Inhalt
+          // scho do ass: nëmmen de Server weess zouverléisseg, ob de Prof
+          // de Plang rem opgemaach ("Wiedereröffnen") oder fräigeschalt
+          // huet -- dat läit ausserhalb vun dësem Browser/Gerät. Ouni dëst
+          // blouf en op engem aneren Apparat rem opgemaachte Plang hei
+          // fälschlecherweis gespaart, well nëmmen den ale lokale Status
+          // benotzt gouf. (Feeler gemellt: "Projektplang net méi
+          // accessible obwuel rem opgemaach" — 2026-09-28.)
+          if (hatLokal && serverStatus !== lokal.status) {
             setServerSync(new Date());
-            return {
-              ...p,
-              titel: projektZeil.Titel || p.titel,
-              status: serverStatus,
-              betreuer: details.betreuer || p.betreuer,
-              betreuer2: details.betreuer2 || p.betreuer2,
-              inhalt: details.inhalt || p.inhalt,
-              motivation: details.motivation || p.motivation,
-              ziele: details.ziele || p.ziele,
-              gruppenarbeit: details.gruppenarbeit || p.gruppenarbeit,
-              partner: details.partner || p.partner,
-              aufgabenteilung: details.aufgabenteilung || p.aufgabenteilung,
-              kostenplanNoetig: details.kostenplanNoetig || p.kostenplanNoetig,
-              kosten: (details.kosten && details.kosten.length > 0) ? details.kosten : p.kosten,
-              gseThemen: (details.gseThemen && details.gseThemen.length > 0) ? details.gseThemen : p.gseThemen,
-              resume: details.resume || p.resume,
-              meilensteine: (details.meilensteine && details.meilensteine.length > 0)
-                ? details.meilensteine.map((m) => ({ id: uid(), datum: m.datum || "", beschreibung: m.beschreibung || m.titel || "", status: m.status || "Ausstoend" }))
-                : p.meilensteine,
-            };
+            if (serverStatus === "Entwurf" && lokal.status !== "Entwurf") setStatusReopenedNotice(true);
+          }
+          // Inhalt: de Server-Stand gëtt gelueden, wann hei nach näischt do ass, oder wann
+          // en méi nei ass wéi dee, mat deem dëst Gerät zeletzt synchron war (anert Gerät).
+          if (!hatLokal) setServerSync(new Date());
+          if (hatLokal && serverLaden) { setServerSync(new Date()); setServerNeuHinweis(true); }
+          setPlan((p) => {
+            let neit = { ...p, status: serverStatus };
+            if (!hatLokal || serverLaden) {
+              const nimm = serverLaden;   // beim Ersetzen zielt de Server, soss just fir eidel Felder
+              const pick = (serverWert, lokalWert) => (nimm ? (serverWert === undefined || serverWert === null ? lokalWert : serverWert) : (serverWert || lokalWert));
+              neit = {
+                ...neit,
+                titel: pick(projektZeil.Titel, p.titel),
+                betreuer: pick(details.betreuer, p.betreuer),
+                betreuer2: pick(details.betreuer2, p.betreuer2),
+                inhalt: pick(details.inhalt, p.inhalt),
+                motivation: pick(details.motivation, p.motivation),
+                ziele: pick(details.ziele, p.ziele),
+                gruppenarbeit: nimm ? !!details.gruppenarbeit : (details.gruppenarbeit || p.gruppenarbeit),
+                partner: pick(details.partner, p.partner),
+                aufgabenteilung: pick(details.aufgabenteilung, p.aufgabenteilung),
+                kostenplanNoetig: nimm ? !!details.kostenplanNoetig : (details.kostenplanNoetig || p.kostenplanNoetig),
+                kosten: (details.kosten && details.kosten.length > 0) ? details.kosten : p.kosten,
+                gseThemen: (details.gseThemen && details.gseThemen.length > 0) ? details.gseThemen : p.gseThemen,
+                resume: pick(details.resume, p.resume),
+                meilensteine: (details.meilensteine && details.meilensteine.length > 0)
+                  ? details.meilensteine.map((m) => ({ id: uid(), datum: m.datum || "", beschreibung: m.beschreibung || m.titel || "", status: m.status || "Ausstoend" }))
+                  : p.meilensteine,
+                letzteSyncMs: serverMs || Date.now(),
+                lokalGeaendertMs: 0,
+              };
+            } else if (entscheedung === "gleich" || entscheedung === "froen") {
+              neit.letzteSyncMs = serverMs; // notéiert, fir net bei all Ouverture nei ze froen
+            }
+            return neit;
           });
         }
 
@@ -288,7 +345,7 @@ function App() {
     // eslint-disable-next-line
   }, [schuelerId, loaded]);
 
-  const update = useCallback((patch) => setPlan((p) => ({ ...p, ...patch })), []);
+  const update = useCallback((patch) => setPlan((p) => ({ ...p, ...patch, lokalGeaendertMs: Date.now() })), []);
 
   const updateMeilenstein = (id, patch) =>
     update({ meilensteine: plan.meilensteine.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
@@ -337,7 +394,8 @@ function App() {
       // Backend-Send, geännert — sou kann d'Formulaire nëmmen dann gespaart
       // ginn, wann de Plang wierklech beim Prof ukomm ass. Feelt de Send,
       // bleift alles um Status "Entwurf" a bleift editéierbar.
-      update({ status });
+      setPlan((p) => ({ ...p, status, letzteSyncMs: Date.now() }));
+      setServerStandText(new Date().toLocaleDateString("de-DE") + " " + new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }));
       setDocUrl(resultat.url);
       setDocPdfUrl(resultat.pdfUrl || null);
       setToast(
@@ -414,7 +472,10 @@ function App() {
                 <span className="status-label">Status</span>
                 <span className={`status-pill status-${plan.status.startsWith("Frei") ? "done" : plan.status.startsWith("Ein") ? "pending" : "draft"}`}>{plan.status}</span>
               </div>
-              <div className="hint-box">Der Entwurf wird automatisch gespeichert. Du kannst jederzeit wiederkommen und weiterarbeiten.</div>
+              <div className="hint-box">
+                Der Entwurf wird automatisch <strong>auf diesem Gerät</strong> gespeichert. Auf dem Server (und auf anderen Geräten) ist er erst nach „💾 Späicheren“.
+                {serverStandText && <><br />☁️ Server-Stand: {serverStandText}</>}
+              </div>
               {!locked && plan.status === "Entwurf" && (
                 <button type="button" className="reset-btn" onClick={entwurfZuruecksetzen}>Lokalen Entwurf zurücksetzen</button>
               )}
@@ -430,6 +491,11 @@ function App() {
               {statusReopenedNotice && (
                 <p className="notice notice-sync" style={{ marginBottom: "14px" }}>
                   🔓 Däi Betreier huet de Projektplang rem opgemaach — du kanns elo weiderschaffen an nach eng Kéier areechen.
+                </p>
+              )}
+              {serverNeuHinweis && (
+                <p className="notice notice-sync" style={{ marginBottom: "14px" }}>
+                  ☁️ Neieren Stand vum Server geluede (op engem anere Gerät gespäichert).
                 </p>
               )}
               {serverSync && (
