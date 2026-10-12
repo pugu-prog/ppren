@@ -2,7 +2,7 @@
  * PPREN Auth-Guard
  * ----------------
  * Op JIDDER geschützter Säit als éischt Script agebonnen (virun de React-Scripten).
- * Préift ob eng gëlteg Session existpéiert; wa net, gëtt direkt op login.html
+ * Préift ob eng gëlteg Session existéiert; wa net, gëtt direkt op login.html
  * geleet (mat "zréck"-Parameter, fir nom Umellen hei zréckzekommen).
  *
  * Setzt global "PPREN_SESSION" = { token, numm, rolle, klasse } zur Verfügung,
@@ -70,13 +70,13 @@
     });
   };
 
-  // Klengt Ofmell-Knäppchen a "Zréck zur Haapsäit"-Link um Rand vun der Säit
+  // Klengt Ofmell-Knäppchen a "Zréck zur Haaptsäit"-Link um Rand vun der Säit
   // derbäisetzen, sou datt béid automatesch iwwerall do sinn, ouni all Säit
   // enzeel upassen ze mussen. "links.html" routt sech selwer weider op
   // proffen.html/schueler.html, jee no Roll.
   function fügOfmellKnäppchenBäi() {
     const startLink = document.createElement("a");
-    startLink.textContent = "🏠 Haapsäit";
+    startLink.textContent = "🏠 Haaptsäit";
     startLink.href = "links.html";
     startLink.style.cssText = [
       "position:fixed", "bottom:12px", "left:12px", "z-index:9999",
@@ -114,7 +114,7 @@
 
   // Glack 🔔 (NËMMEN Proffen): zeigt Meldungen aus dem Backend (z.B. geplangt Rendez-vousen,
   // Erënnerungen) mat Zuel vun den neien. Hänkt sech selwer op all Prof-Säit, ouni dass
-  // eng Säit enzel ugepasst muss ginn. Fehler hei blockpéieren ni d'Säit.
+  // eng Säit enzel ugepasst muss ginn. Fehler hei blockéieren ni d'Säit.
   function fügGlackBäi() {
     if (rolle !== "Prof") return;
     const API = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
@@ -236,13 +236,13 @@
       setTimeout(bäisetzen, 0);
     }
   }
-  try { fügGlackBäi(); } catch (e) { /* d'Glack däerf ni d'Säit oder d'Session-Kontroll blockpéieren */ }
+  try { fügGlackBäi(); } catch (e) { /* d'Glack däerf ni d'Säit oder d'Session-Kontroll blockéieren */ }
 
   // Session am Hannergrond validéieren (ofgelaf Sessioune erausfannen), ouni
-  // d'Säit ze blockpéieren — bei Ongëltegkeet gëtt sanft op login.html geleet.
+  // d'Säit ze blockéieren — bei Ongëltegkeet gëtt sanft op login.html geleet.
   // De Server ass déi eenzeg authoritativ Quell fir d'Roll: den initialen Check
   // hei driwwer baséiert nëmmen op localStorage, dat kann ëmgeängt ginn (z.B. iwwer
-  // DevTools). Dofir gëtt d'Roll hei mat der Server-Äntwert ofgegläch a lokal
+  // DevTools). Dofir gëtt d'Roll hei mat der Server-Äntwert ofgeglach a lokal
   // korrigéiert/geläscht, wann se net iwwerteneestëmmen.
   const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
   fetch(WEB_APP_URL, {
@@ -279,5 +279,5 @@
         localStorage.setItem("ppren_klasse", data.klasse || "");
       }
     })
-    .catch(() => {}); // Bei Netzwerkfehler: Säit bleift nutzbar, näischt blockpéieren
+    .catch(() => {}); // Bei Netzwerkfehler: Säit bleift nutzbar, näischt blockéieren
 })();
