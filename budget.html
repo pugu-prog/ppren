@@ -70,6 +70,9 @@ function App() {
   const [geplangtKosten, setGeplangtKosten] = useState([]);
   const [budgetStatus, setBudgetStatus] = useState(null); // null | "Ageraecht" | "Genehmegt"
   const [budgetMax, setBudgetMax] = useState(500);
+  const [budgetUgefrot, setBudgetUgefrot] = useState(0);
+  const [mehrBetrag, setMehrBetrag] = useState("");
+  const [mehrGrund, setMehrGrund] = useState("");
   const [ausgaben, setAusgaben] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -107,6 +110,7 @@ function App() {
         const meng = (data.budget || []).find((b) => b.Schüler === currentSchueler?.name);
         setBudgetStatus(meng ? meng.Status : null);
         setBudgetMax(meng && meng.Max ? Number(meng.Max) : 500);
+        setBudgetUgefrot(meng && meng.Ugefrot ? Number(meng.Ugefrot) : 0);
         setAusgaben((data.ausgaben || []).filter((a) => a.Schüler === currentSchueler?.name));
       })
       .catch(() => setError("Konnte Budget-Info net lueden."))
@@ -119,7 +123,10 @@ function App() {
   const iwwerschratt = summeAusgi > budgetMax;
   const noProzentWarnung = !iwwerschratt && prozent >= WARNUNGS_SCHWELL * 100;
 
-  const genehmegungUfroen = async () => {
+  // Standard-Budget (500 €) braucht keng Genehmegung. Fir méi muss de Prof den Betrag ausdrécklech genehmegen.
+  const mehrOk = Number(mehrBetrag) > budgetMax && mehrGrund.trim();
+  const mehrBudgetUfroen = async () => {
+    if (!mehrOk) return;
     setSyncing(true);
     setError(null);
     try {
@@ -131,11 +138,14 @@ function App() {
           token: window.PPREN_SESSION?.token || "",
           schueler: currentSchueler?.name,
           klasse: currentSchueler?.klasse,
+          betrag: Number(mehrBetrag),
+          begruendung: mehrGrund,
         }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
-      setToast("Genehmegung ugefrot — de Prof kritt Bescheed.");
+      setToast("Mehrbudget ugefrot — de Prof kritt Bescheed.");
+      setMehrBetrag(""); setMehrGrund("");
       lade();
     } catch (e) {
       setError("Konnte net ufroen: " + e.message);
@@ -257,30 +267,12 @@ function App() {
               </section>
             )}
 
-            {(!budgetStatus) && (
-              <section className="card">
-                <h2>Kostenplang genehmegen loossen</h2>
-                <p className="hint">Ier Ausgaben ageginn ka ginn, muss den Prof de Kostenplang aus dem Projektplang genehmegen (Standard-Budget 500 €; geet däi Kostenplang driwwer, leet de Prof de genehmegten Betrag fest).</p>
-                {istSchueler && (
-                  <button className="btn btn-primary" disabled={syncing} onClick={genehmegungUfroen}>
-                    {syncing ? "Freet un…" : "📨 Genehmegung ufroen"}
-                  </button>
-                )}
-                {!istSchueler && (
-                  <button className="btn btn-primary" disabled={syncing} onClick={genehmegungUfroen}>
-                    {syncing ? "Freet un…" : "📨 Kostenplang direkt genehmegen"}
-                  </button>
-                )}
-              </section>
-            )}
+            <section className="card">
+              <h2>Budget</h2>
+              <p className="hint">Standard-Budget: <strong>{budgetMax} €</strong> — Ausgaben kanns du direkt aginn. Brauchs du méi, muss de Prof de méi héijen Betrag ausdrécklech genehmegen (siehe „Méi Budget ufroen“ weider drënner).</p>
+            </section>
 
-            {budgetStatus === "Ageraecht" && (
-              <section className="card">
-                <div className="notice notice-pending">⏳ Genehmegung ugefrot — waart op de Prof, ier Ausgaben ageginn kënne ginn.</div>
-              </section>
-            )}
-
-            {budgetStatus === "Genehmegt" && (
+            {(
               <>
                 <section className="card">
                   <h2>Budget-Iwwersiicht</h2>
@@ -292,8 +284,28 @@ function App() {
                     <span>Restbudget: <strong>{(budgetMax - summeAusgi).toFixed(2)} €</strong></span>
                     <span className="cell-muted">/ {budgetMax} €</span>
                   </div>
-                  {iwwerschratt && <p className="notice notice-error">⚠️ Budget iwwerschratt!</p>}
+                  {iwwerschratt && <p className="notice notice-error">⚠️ Budget iwwerschratt! Freet méi Budget un.</p>}
                   {noProzentWarnung && <p className="notice notice-warn">⚠️ Iwwer 90% vum Budget ausginn.</p>}
+                </section>
+
+                <section className="card">
+                  <h2>Méi Budget ufroen</h2>
+                  {budgetUgefrot > budgetMax && (
+                    <p className="notice notice-pending" style={{ marginBottom: "12px" }}>⏳ Mehrbudget ugefrot: <strong>{budgetUgefrot.toFixed(2)} €</strong> (genehmegt bis elo: {budgetMax} €) — waart op de Prof.</p>
+                  )}
+                  <div className="grid2">
+                    <label className="field">
+                      <span className="field-label">Gewënscht Gesamtbudget (€)</span>
+                      <input type="number" step="0.01" min="0" className="input" placeholder={`méi wéi ${budgetMax}`} value={mehrBetrag} onKeyDown={(e) => { if (e.key === "-" || e.key === "e" || e.key === "E") e.preventDefault(); }} onChange={(e) => setMehrBetrag(String(e.target.value).replace(/-/g, ""))} />
+                    </label>
+                    <label className="field">
+                      <span className="field-label">Begrënnung (Pflicht)</span>
+                      <input className="input" value={mehrGrund} onChange={(e) => setMehrGrund(e.target.value)} placeholder="Wou fir brauchs du méi?" />
+                    </label>
+                  </div>
+                  <button className="btn btn-primary" disabled={!mehrOk || syncing} onClick={mehrBudgetUfroen}>
+                    {syncing ? "Freet un…" : "📨 Méi Budget ufroen"}
+                  </button>
                 </section>
 
                 <section className="card">
