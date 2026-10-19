@@ -72,6 +72,7 @@ const emptyPlan = () => ({
   aufgabenteilung: "",
   kostenplanNoetig: false,
   kosten: [{ id: uid(), bezeichnung: "", betrag: "" }],
+  kostenBegruendung: "",
   status: "Entwurf",
   zuletztGespeichert: null,
 });
@@ -280,7 +281,7 @@ function App() {
             setServerSync(new Date());
             if (serverStatus === "Entwurf" && lokal.status !== "Entwurf") setStatusReopenedNotice(true);
           }
-          // Inhalt: de Server-Stand gëtt gelueden, wann hei nach näischt do ass, oder wann
+          // Inhalt: de Server-Stand gëtt geluede, wann hei nach näischt do ass, oder wann
           // en méi nei ass wéi dee, mat deem dëst Gerät zeletzt synchron war (anert Gerät).
           if (!hatLokal) setServerSync(new Date());
           if (hatLokal && serverLaden) { setServerSync(new Date()); setServerNeuHinweis(true); }
@@ -304,6 +305,7 @@ function App() {
                 kosten: (details.kosten && details.kosten.length > 0) ? details.kosten : p.kosten,
                 gseThemen: (details.gseThemen && details.gseThemen.length > 0) ? details.gseThemen : p.gseThemen,
                 resume: pick(details.resume, p.resume),
+                kostenBegruendung: pick(details.kostenBegruendung, p.kostenBegruendung),
                 meilensteine: (details.meilensteine && details.meilensteine.length > 0)
                   ? details.meilensteine.map((m) => ({ id: uid(), datum: m.datum || "", beschreibung: m.beschreibung || m.titel || "", status: m.status || "Ausstoend" }))
                   : p.meilensteine,
@@ -360,9 +362,11 @@ function App() {
     update({ kosten: [...plan.kosten, { id: uid(), bezeichnung: "", betrag: "" }] });
   const removeKosten = (id) => update({ kosten: plan.kosten.filter((k) => k.id !== id) });
 
-  const kostenSumme = plan.kosten.reduce((s, k) => s + (parseFloat(k.betrag) || 0), 0);
-  const budgetUeberschritten = kostenSumme > BUDGET_MAX;
-  const canSubmit = plan.betreuer && plan.titel && plan.inhalt && plan.motivation && plan.ziele && !budgetUeberschritten;
+  const kostenSumme = plan.kosten.reduce((s, k) => s + Math.max(0, parseFloat(k.betrag) || 0), 0);
+  // Iwwer dem Standard-Budget (500 €) ass méiglech, brauch awer eng Begrënnung an d'ausdrécklech Genehmegung vum Prof.
+  const iwwerStandard = plan.kostenplanNoetig && kostenSumme > BUDGET_MAX;
+  const canSubmit = plan.betreuer && plan.titel && plan.inhalt && plan.motivation && plan.ziele
+    && (!iwwerStandard || plan.kostenBegruendung.trim());
 
   const buildPayload = (status) => ({
     token: window.PPREN_SESSION?.token || "",
@@ -382,6 +386,7 @@ function App() {
     aufgabenteilung: plan.aufgabenteilung,
     kostenplanNoetig: plan.kostenplanNoetig,
     kosten: plan.kostenplanNoetig ? plan.kosten.filter((k) => k.bezeichnung) : [],
+    kostenBegruendung: plan.kostenplanNoetig ? plan.kostenBegruendung : "",
     status,
   });
 
@@ -658,7 +663,7 @@ function App() {
                   <h2>5. Kostenplan</h2>
                   <label className="toggle-row">
                     <input type="checkbox" checked={plan.kostenplanNoetig} onChange={(e) => update({ kostenplanNoetig: e.target.checked })} />
-                    <span>Mein Projekt benötigt ein Budget (max. {BUDGET_MAX} €)</span>
+                    <span>Mein Projekt benötigt ein Budget (Standard bis {BUDGET_MAX} €, mehr nur mit Genehmigung des Lehrers)</span>
                   </label>
                   {plan.kostenplanNoetig && (
                     <div className="indent">
@@ -666,18 +671,23 @@ function App() {
                         {plan.kosten.map((k) => (
                           <div className="repeat-row repeat-row-budget" key={k.id}>
                             <input className="input" placeholder="Position" value={k.bezeichnung} onChange={(e) => updateKosten(k.id, { bezeichnung: e.target.value })} />
-                            <input type="number" className="input input-money" placeholder="0.00" value={k.betrag} onChange={(e) => updateKosten(k.id, { betrag: e.target.value })} />
+                            <input type="number" min="0" step="0.01" className="input input-money" placeholder="0.00" value={k.betrag} onKeyDown={(e) => { if (e.key === "-" || e.key === "e" || e.key === "E") e.preventDefault(); }} onChange={(e) => updateKosten(k.id, { betrag: String(e.target.value).replace(/-/g, "") })} />
                             <span className="currency">€</span>
                             {plan.kosten.length > 1 && <button type="button" className="icon-btn" onClick={() => removeKosten(k.id)}>✕</button>}
                           </div>
                         ))}
                         <button type="button" className="add-btn" onClick={addKosten}>+ Position hinzufügen</button>
                       </div>
-                      <div className={`budget-summary ${budgetUeberschritten ? "over" : ""}`}>
+                      <div className={`budget-summary ${iwwerStandard ? "over" : ""}`}>
                         <span>Summe: {kostenSumme.toFixed(2)} €</span>
-                        <span>Restbudget: {(BUDGET_MAX - kostenSumme).toFixed(2)} €</span>
-                        {budgetUeberschritten && <span className="over-label">Budget überschritten</span>}
+                        <span>{iwwerStandard ? `Über dem Standard um ${(kostenSumme - BUDGET_MAX).toFixed(2)} €` : `Restbudget: ${(BUDGET_MAX - kostenSumme).toFixed(2)} €`}</span>
+                        {iwwerStandard && <span className="over-label">⚠️ braucht Genehmigung des Lehrers</span>}
                       </div>
+                      {iwwerStandard && (
+                        <Field label="Begründung für den höheren Betrag (Pflicht)" hint="Warum brauchst du mehr als 500 €? Der Lehrer legt den genehmigten Betrag fest.">
+                          <textarea className="textarea" rows={3} value={plan.kostenBegruendung} onChange={(e) => update({ kostenBegruendung: e.target.value })} />
+                        </Field>
+                      )}
                       <p className="field-hint" style={{ marginTop: "8px" }}>
                         💡 Dëse Kostenplang ass nëmmen eng Plangung. Fir tatsächlech Ausgaben anzedroen (nodeem den Prof de Kostenplang genehmegt huet), benotz d'<a href="budget.html">Budget-Tool</a>.
                       </p>
@@ -772,7 +782,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; }
 .indent { margin-top: 12px; padding-left: 14px; border-left: 2px solid #dfe9e2; }
 .budget-summary { display: flex; gap: 18px; font-size: 13px; font-weight: 600; background: #eef3ef; padding: 10px 12px; border-radius: 8px; margin-top: 8px; color: #294f3c; }
-.budget-summary.over { background: #fbe4e1; color: #8a2b1f; }
+.budget-summary.over { background: #fbe8c6; color: #8a5a12; }
 .actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 0 30px; }
 .btn { font-size: 13.5px; font-weight: 700; padding: 10px 16px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; }
 .btn-primary { background: #00A94F; color: #fff; }
