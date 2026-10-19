@@ -135,7 +135,7 @@ function App() {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
-      setToast("Genehmegung ugefrot — de Prof gëtt informpéiert.");
+      setToast("Genehmegung ugefrot — de Prof kritt Bescheed.");
       lade();
     } catch (e) {
       setError("Konnte net ufroen: " + e.message);
