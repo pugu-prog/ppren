@@ -118,8 +118,11 @@ function plangRegelCheck(p) {
     const kosten = d.kosten || [];
     if (kosten.length === 0) add("Kostenplan", "wichtig", "Dein Kostenplan ist leer. Liste alle Positionen mit Preis auf.");
     if (kosten.some((k) => !(parseFloat(k.betrag) > 0))) add("Kostenplan", "mittel", "Einige Positionen haben keinen Betrag oder 0 €. Gib für jede Position einen Preis an (mit Link oder Angebot) oder schreibe dazu, dass das Teil schon vorhanden ist.");
-    const summ = kosten.reduce((a, k) => a + (parseFloat(k.betrag) || 0), 0);
-    if (summ > 500) add("Kostenplan", "wichtig", "Dein Kostenplan liegt über 500 €. Kürze oder begründe die Positionen.");
+    const summ = kosten.reduce((a, k) => a + Math.max(0, parseFloat(k.betrag) || 0), 0);
+    if (summ > 500) {
+      if (t(d.kostenBegruendung)) add("Kostenplan", "klein", "Dein Kostenplan liegt über 500 €. Das muss der Lehrer ausdrücklich genehmigen.");
+      else add("Kostenplan", "wichtig", "Dein Kostenplan liegt über 500 €. Das geht nur mit Genehmigung des Lehrers: begründe die Positionen kurz im Formular.");
+    }
   }
   return punkte;
 }
@@ -193,13 +196,14 @@ function App() {
 
   useEffect(() => { lade(); }, []);
 
-  const kostenplanGenehmegen = async (schueler, klasse) => {
+  // max = genehmegten Betrag (€); undefined = Standard-Budget (500 €) bleift.
+  const kostenplanGenehmegen = async (schueler, klasse, max) => {
     setGenehmegId(schueler);
     try {
       const res = await fetch(WEB_APP_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ typ: "kostenplanGenehmegen", token: window.PPREN_SESSION?.token || "", schueler, klasse }),
+        body: JSON.stringify({ typ: "kostenplanGenehmegen", token: window.PPREN_SESSION?.token || "", schueler, klasse, ...(max !== undefined ? { max } : {}) }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Unbekannter Fehler");
@@ -209,6 +213,31 @@ function App() {
     } finally {
       setGenehmegId(null);
     }
+  };
+
+  // Prof leet de genehmegten Betrag fest (iwwer dem Standard-Budget muss dat ausdrécklech sinn).
+  const betragFroen = (text, virgab) => {
+    const eng = window.prompt(text, String(virgab));
+    if (eng === null) return null;
+    const zuel = Number(String(eng).replace(",", ".").replace(/[^0-9.]/g, ""));
+    if (!(zuel > 0)) { alert("Ongëltegen Betrag."); return null; }
+    return Math.round(zuel * 100) / 100;
+  };
+  const budgetGenehmegen = (b, planSumm) => {
+    const wunsch = Math.max(500, Math.round(planSumm * 100) / 100);
+    if (planSumm > 500) {
+      const max = betragFroen(
+        `${b.Schüler} freet ${planSumm.toFixed(2)} € un (Standard: 500 €).\n\nGenehmegten Betrag (€) — du kanns en och méi niddreg ustellen:`, wunsch);
+      if (max === null) return;
+      kostenplanGenehmegen(b.Schüler, b.Klasse, max);
+    } else {
+      kostenplanGenehmegen(b.Schüler, b.Klasse);
+    }
+  };
+  const budgetMaxAendern = (b) => {
+    const max = betragFroen(`Neie genehmegten Betrag (€) fir ${b.Schüler}:`, Number(b.Max) || 500);
+    if (max === null) return;
+    kostenplanGenehmegen(b.Schüler, b.Klasse, max);
   };
 
   // "wiedereroeffnen" a "kommentarHinzefuegen" benotzen elo béid ee gemeinsamt
@@ -863,23 +892,42 @@ function App() {
           <table className="table">
             <thead>
               <tr>
-                <th>Schüler/-in</th><th>Klasse</th><th>Status</th><th>Ausgi / Max</th><th></th>
+                <th>Schüler/-in</th><th>Klasse</th><th>Status</th><th>Kostenplang ugefrot</th><th>Ausgi / Max</th><th></th>
               </tr>
             </thead>
             <tbody>
               {budget.map((b, i) => {
                 const ausgi = ausgiFuer(b.Schüler);
                 const max = Number(b.Max) || 500;
+                const proj = projekte.find((p) => p.Schüler === b.Schüler);
+                const det = proj ? plangDetailsVun(proj) : {};
+                const planSumm = det.kostenplanNoetig
+                  ? (det.kosten || []).reduce((a, k) => a + Math.max(0, parseFloat(k.betrag) || 0), 0)
+                  : (Number(b.Ugefrot) || 0);
+                const iwwerStandard = planSumm > 500;
+                const iwwerMax = b.Status === "Genehmegt" && planSumm > max;
+                const begruendung = String(det.kostenBegruendung || "").trim();
                 return (
                   <tr key={i}>
                     <td className="cell-strong">{ufweis(b.Schüler)}</td>
                     <td>{b.Klasse}</td>
                     <td><span className={`pill pill-${b.Status === "Genehmegt" ? "done" : "pending"}`}>{b.Status}</span></td>
+                    <td>
+                      {planSumm > 0 ? <strong>{planSumm.toFixed(2)} €</strong> : <span className="cell-muted">–</span>}
+                      {iwwerStandard && <span className="budget-warn" title="Méi wéi 500 € — brauch ausdrécklech Genehmegung vum Prof">⚠️ iwwer 500 €</span>}
+                      {iwwerMax && <span className="budget-warn" title={`Genehmegt: ${max} €`}>⚠️ méi wéi genehmegt</span>}
+                      {begruendung && <div className="budget-begruendung" title={begruendung}>„{begruendung.length > 160 ? begruendung.slice(0, 160) + "…" : begruendung}“</div>}
+                    </td>
                     <td className="cell-muted">{b.Status === "Genehmegt" ? `${ausgi.toFixed(2)} € / ${max} €` : "–"}</td>
                     <td>
                       {b.Status === "Ageraecht" && (
-                        <button className="btn-gen" disabled={genehmegId === b.Schüler} onClick={() => kostenplanGenehmegen(b.Schüler, b.Klasse)}>
+                        <button className="btn-gen" disabled={genehmegId === b.Schüler} onClick={() => budgetGenehmegen(b, planSumm)}>
                           {genehmegId === b.Schüler ? "…" : "✅ Genehmegen"}
+                        </button>
+                      )}
+                      {b.Status === "Genehmegt" && (
+                        <button className="btn-gen" disabled={genehmegId === b.Schüler} onClick={() => budgetMaxAendern(b)} title="Genehmegten Betrag änneren">
+                          {genehmegId === b.Schüler ? "…" : "✏️ Max"}
                         </button>
                       )}
                     </td>
@@ -1252,6 +1300,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .check-beleg { flex: 1 1 100%; font-size: 12px; color: #55625a; }
 .check-hiweis { font-size: 12.5px; color: #8a5a12; background: #fbe8c6; padding: 8px 12px; border-radius: 8px; margin: 0 0 10px; }
 .check-fehler { font-size: 12.5px; color: #8a2b1f; background: #fbe4e1; padding: 8px 12px; border-radius: 8px; margin: 0 0 10px; }
+.budget-warn { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 800; color: #8a5a12; background: #fbe8c6; border: 1px solid #f0d29a; padding: 2px 8px; border-radius: 20px; }
+.budget-begruendung { margin-top: 4px; font-size: 11.5px; color: #55625a; font-style: italic; max-width: 320px; white-space: normal; }
 .fb-meta { font-size: 11px; color: #6d7d74; white-space: nowrap; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
 .btn-gen-primary { color: #fff; background: #00A94F; border-color: #00A94F; }
