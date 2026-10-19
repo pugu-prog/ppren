@@ -135,7 +135,7 @@ function App() {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
-      setToast("Genehmegung ugefrot — de Prof gëtt informéiert.");
+      setToast("Genehmegung ugefrot — de Prof gëtt informpéiert.");
       lade();
     } catch (e) {
       setError("Konnte net ufroen: " + e.message);
@@ -145,7 +145,7 @@ function App() {
     }
   };
 
-  const canSubmit = bezeechnung.trim() && betrag !== "" && datum;
+  const canSubmit = bezeechnung.trim() && betrag !== "" && Number(betrag) >= 0 && datum;
 
   const ausgabSpäicheren = async () => {
     if (!canSubmit) return;
@@ -260,7 +260,7 @@ function App() {
             {(!budgetStatus) && (
               <section className="card">
                 <h2>Kostenplang genehmegen loossen</h2>
-                <p className="hint">Ier Ausgaben ageginn ka ginn, muss den Prof de Kostenplang aus dem Projektplang genehmegen (500 € Standard-Budget).</p>
+                <p className="hint">Ier Ausgaben ageginn ka ginn, muss den Prof de Kostenplang aus dem Projektplang genehmegen (Standard-Budget 500 €; geet däi Kostenplang driwwer, leet de Prof de genehmegten Betrag fest).</p>
                 {istSchueler && (
                   <button className="btn btn-primary" disabled={syncing} onClick={genehmegungUfroen}>
                     {syncing ? "Freet un…" : "📨 Genehmegung ufroen"}
@@ -305,7 +305,7 @@ function App() {
                     </label>
                     <label className="field">
                       <span className="field-label">Betrag (€)</span>
-                      <input type="number" step="0.01" min="0" className="input" value={betrag} onChange={(e) => setBetrag(e.target.value)} />
+                      <input type="number" step="0.01" min="0" className="input" value={betrag} onKeyDown={(e) => { if (e.key === "-" || e.key === "e" || e.key === "E") e.preventDefault(); }} onChange={(e) => setBetrag(String(e.target.value).replace(/-/g, ""))} />
                     </label>
                   </div>
                   <div className="grid2">
