@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" type="image/png" href="LogoSE_weisHintergrund.png" />
+<title>PPREN Terminer</title>
+<script>window.PPREN_ERFUERDERT_ROLLE = "Prof";</script>
+<script src="auth-guard.js"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  window.addEventListener("error", function (e) {
+    document.getElementById("root").innerHTML =
+      '<div style="padding:40px;font-family:sans-serif;color:#8a2b1f;white-space:pre-wrap;">' +
+      '<h2 style="margin-top:0;">Fehler beim Laden</h2>' +
+      (e.message || "Unbekannter Fehler") +
+      (e.filename ? "\n\nDatei: " + e.filename + " Zeile " + e.lineno : "") +
+      "</div>";
+  });
+</script>
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
+const WOCHENDAG = ["Sonndeg", "Méindeg", "Dënschdeg", "Mëttwoch", "Donneschdeg", "Freideg", "Samschdeg"];
+
+const p2 = (n) => String(n).padStart(2, "0");
+
+// Datum aus dem Sheet (Text "dd.MM.yyyy" oder ISO) -> "yyyy-MM-dd"
+function datumZuIso(wert) {
+  if (!wert) return "";
+  const t = String(wert);
+  if (/^\d{4}-\d{2}-\d{2}T/.test(t)) {
+    const d = new Date(t);
+    return isNaN(d) ? "" : `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+  }
+  let m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (m) return `${m[3]}-${p2(m[2])}-${p2(m[1])}`;
+  m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+}
+const isoZuDmy = (iso) => iso.split("-").reverse().join(".");
+
+// Zäit aus dem Sheet ("HH:mm" oder ISO) -> "HH:mm" oder ""
+function zeitZuText(wert) {
+  if (!wert) return "";
+  const t = String(wert);
+  if (/^\d{4}-\d{2}-\d{2}T/.test(t)) {
+    const d = new Date(t);
+    return isNaN(d) ? "" : `${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  }
+  const m = t.match(/^(\d{1,2}):(\d{2})/);
+  return m ? `${p2(m[1])}:${m[2]}` : "";
+}
+
+function zeitEnn(zeit, dauer) {
+  if (!zeit || !(Number(dauer) > 0)) return "";
+  const [h, mi] = zeit.split(":").map(Number);
+  const e = h * 60 + mi + Number(dauer);
+  return `${p2(Math.floor(e / 60) % 24)}:${p2(e % 60)}`;
+}
+
+function wochendagVun(iso) {
+  const [j, m, t] = iso.split("-").map(Number);
+  return WOCHENDAG[new Date(j, m - 1, t).getDay()];
+}
+
+function heidegIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+}
+
+// Kalennerdatei (.ics) fir all gewisen Terminer
+function bauIcs(terminer) {
+  const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const events = terminer.map((r) => {
+    const [j, m, t] = r.iso.split("-");
+    let start, end;
+    if (r.zeit) {
+      const [hh, mi] = r.zeit.split(":").map(Number);
+      const ende = hh * 60 + mi + (Number(r.dauer) || 30);
+      start = `DTSTART;TZID=Europe/Luxembourg:${j}${m}${t}T${p2(hh)}${p2(mi)}00`;
+      end = `DTEND;TZID=Europe/Luxembourg:${j}${m}${t}T${p2(Math.floor(ende / 60))}${p2(ende % 60)}00`;
+    } else {
+      const d = new Date(Number(j), Number(m) - 1, Number(t) + 1);
+      start = `DTSTART;VALUE=DATE:${j}${m}${t}`;
+      end = `DTEND;VALUE=DATE:${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}`;
+    }
+    return ["BEGIN:VEVENT", `UID:${r.id || r.iso + r.schueler}@ppren`, `DTSTAMP:${stamp}`, start, end,
+      "SUMMARY:" + esc(`PPREN: ${r.typ} — ${r.virnumm || r.schueler}`),
+      r.notiz ? "DESCRIPTION:" + esc(r.notiz) : null,
+      "END:VEVENT"].filter(Boolean).join("\r\n");
+  });
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//PPREN//Terminer//LB", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"]
+    .concat(events, ["END:VCALENDAR"]).join("\r\n");
+}
+
+function App() {
+  const ich = String(window.PPREN_SESSION?.numm || "");
+  const [rohTerminer, setRohTerminer] = useState([]);
+  const [projekte, setProjekte] = useState([]);
+  const [personen, setPersonen] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [zeitraum, setZeitraum] = useState("kommend"); // kommend | vergaangen | alles
+  const [nurMeng, setNurMeng] = useState(false);
+  const [filterKlasse, setFilterKlasse] = useState("alle");
+  const [filterTyp, setFilterTyp] = useState("alle");
+  const [suche, setSuche] = useState("");
+
+  const lade = () => {
+    setLoading(true);
+    setError(null);
+    fetch(WEB_APP_URL + "?token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""))
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.ok) { setError(data.error || "Konnt d'Terminer net lueden."); return; }
+        setRohTerminer(data.rendezvousen || []);
+        setProjekte(data.projekte || []);
+        setPersonen(data.personen || []);
+      })
+      .catch(() => setError("Konnt d'Terminer net lueden."))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { lade(); }, []);
+
+  const virnummVun = useMemo(() => {
+    const map = {};
+    personen.forEach((p) => { if (p.virnumm) map[p.numm] = p.virnumm; });
+    return map;
+  }, [personen]);
+  const betreuerVun = useMemo(() => {
+    const map = {};
+    projekte.forEach((p) => { map[p.Schüler] = String(p.Betreuer || ""); });
+    return map;
+  }, [projekte]);
+
+  const alleTerminer = useMemo(() => rohTerminer
+    .map((r) => {
+      const iso = datumZuIso(r.Datum);
+      const zeit = zeitZuText(r.Zäit);
+      return {
+        id: r.ID, iso, zeit, dauer: Number(r.Dauer) || 0, typ: r.Typ || "", schueler: r.Schüler || "",
+        virnumm: virnummVun[r.Schüler] || "", klasse: r.Klasse || "", notiz: r.Notiz || "",
+        planer: String(r["Erstallt vum"] || ""), betreuer: betreuerVun[r.Schüler] || "",
+      };
+    })
+    .filter((r) => r.iso)
+    .sort((a, b) => (a.iso + a.zeit).localeCompare(b.iso + b.zeit)), [rohTerminer, virnummVun, betreuerVun]);
+
+  const heiteg = heidegIso();
+  const klassen = useMemo(() => ["alle", ...new Set(alleTerminer.map((r) => r.klasse).filter(Boolean))], [alleTerminer]);
+  const typen = useMemo(() => ["alle", ...new Set(alleTerminer.map((r) => r.typ).filter(Boolean))], [alleTerminer]);
+
+  const gefiltert = alleTerminer.filter((r) => {
+    if (zeitraum === "kommend" && r.iso < heiteg) return false;
+    if (zeitraum === "vergaangen" && r.iso >= heiteg) return false;
+    if (filterKlasse !== "alle" && r.klasse !== filterKlasse) return false;
+    if (filterTyp !== "alle" && r.typ !== filterTyp) return false;
+    if (nurMeng) {
+      const kleng = ich.toLowerCase();
+      const meng = r.betreuer.toLowerCase().includes(kleng) || r.planer.toLowerCase() === kleng;
+      if (!meng) return false;
+    }
+    if (suche && !`${r.schueler} ${r.virnumm} ${r.typ} ${r.notiz}`.toLowerCase().includes(suche.toLowerCase())) return false;
+    return true;
+  });
+  const sortiert = zeitraum === "vergaangen" ? [...gefiltert].reverse() : gefiltert;
+
+  const proDag = useMemo(() => {
+    const gruppen = [];
+    sortiert.forEach((r) => {
+      const letzt = gruppen[gruppen.length - 1];
+      if (letzt && letzt.iso === r.iso) letzt.zeilen.push(r);
+      else gruppen.push({ iso: r.iso, zeilen: [r] });
+    });
+    return gruppen;
+  }, [sortiert]);
+
+  const naechsten = alleTerminer.find((r) => r.iso >= heiteg);
+  const icsHerunnerlueden = () => {
+    const blob = new Blob([bauIcs(sortiert)], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "PPREN_Terminer.ics";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="wrap">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark">PPREN</span>
+          <span className="brand-sub">Terminer mat de Schüler · Sciences Environnementales</span>
+        </div>
+        <div className="topbar-rechts">
+          <button className="refresh-btn" onClick={lade} disabled={loading}>{loading ? "Lädt…" : "🔄 Aktualiséieren"}</button>
+        </div>
+      </header>
+
+      <div className="content">
+        <div className="stats-row">
+          <div className="stat-card">
+            <span className="stat-num">{alleTerminer.filter((r) => r.iso >= heiteg).length}</span>
+            <span className="stat-label">Kommend Terminer</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-num">{naechsten ? `${isoZuDmy(naechsten.iso).slice(0, 5)}${naechsten.zeit ? " · " + naechsten.zeit : ""}` : "–"}</span>
+            <span className="stat-label">Nächsten Termin</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-num">{sortiert.length}</span>
+            <span className="stat-label">Am Filter</span>
+          </div>
+        </div>
+
+        <div className="controls">
+          <div className="seg">
+            {[["kommend", "Kommend"], ["vergaangen", "Vergaangen"], ["alles", "Alles"]].map(([k, l]) => (
+              <button key={k} className={`seg-btn${zeitraum === k ? " aktiv" : ""}`} onClick={() => setZeitraum(k)}>{l}</button>
+            ))}
+          </div>
+          <select className="select" value={filterKlasse} onChange={(e) => setFilterKlasse(e.target.value)}>
+            {klassen.map((k) => <option key={k} value={k}>{k === "alle" ? "Alle Klassen" : k}</option>)}
+          </select>
+          <select className="select" value={filterTyp} onChange={(e) => setFilterTyp(e.target.value)}>
+            {typen.map((t) => <option key={t} value={t}>{t === "alle" ? "All Typen" : t}</option>)}
+          </select>
+          <label className="check-label">
+            <input type="checkbox" checked={nurMeng} onChange={(e) => setNurMeng(e.target.checked)} />
+            Nëmme meng Schüler
+          </label>
+          <input className="search" placeholder="Sich no Schüler, Typ, Notiz…" value={suche} onChange={(e) => setSuche(e.target.value)} />
+        </div>
+
+        <div className="aktiounen">
+          <button className="btn-gen" onClick={icsHerunnerlueden} disabled={sortiert.length === 0}>📆 Als Kalenner (.ics)</button>
+          <button className="btn-gen" onClick={() => window.print()} disabled={sortiert.length === 0}>🖨️ Drock / PDF</button>
+          <a className="btn-gen" href="rendezvousen.html">➕ Rendez-vousen plangen</a>
+        </div>
+
+        {error && <div className="empty error">{error}</div>}
+        {loading && <div className="empty">Lädt…</div>}
+        {!loading && !error && proDag.length === 0 && <div className="empty">Keng Terminer fir dëse Filter.</div>}
+
+        {!loading && !error && proDag.map((g) => (
+          <section className={`dag${g.iso === heiteg ? " dag-haut" : ""}`} key={g.iso}>
+            <h2 className="dag-titel">
+              {wochendagVun(g.iso)}, {isoZuDmy(g.iso)}
+              {g.iso === heiteg && <span className="haut-badge">haut</span>}
+              <span className="dag-zuel">{g.zeilen.length} Termin{g.zeilen.length === 1 ? "" : "er"}</span>
+            </h2>
+            <table className="table">
+              <thead>
+                <tr><th>Zäit</th><th>Typ</th><th>Schüler/-in</th><th>Klass</th><th>Betreier</th><th>Notiz</th></tr>
+              </thead>
+              <tbody>
+                {g.zeilen.map((r, i) => (
+                  <tr key={r.id || i}>
+                    <td className="cell-strong zaeit">{r.zeit ? `${r.zeit}${zeitEnn(r.zeit, r.dauer) ? " – " + zeitEnn(r.zeit, r.dauer) : ""}` : "–"}</td>
+                    <td><span className="pill">{r.typ}</span></td>
+                    <td className="cell-strong">{r.virnumm ? `${r.virnumm} · ${r.schueler}` : r.schueler}</td>
+                    <td>{r.klasse}</td>
+                    <td className="cell-muted">{r.betreuer || "–"}</td>
+                    <td className="cell-muted notiz">{r.notiz || "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-serif; color: #1c2621; background: #f6f8f6; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 22px; background: #00A94F; color: #fff; }
+.brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.brand-mark { font-weight: 800; font-size: 15px; letter-spacing: 0.06em; }
+.brand-sub { font-size: 13px; opacity: 0.85; }
+.topbar-rechts { display: flex; gap: 8px; align-items: center; }
+.refresh-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; font-size: 12.5px; font-weight: 700; padding: 7px 14px; border-radius: 8px; cursor: pointer; }
+.refresh-btn:hover { background: rgba(255,255,255,0.25); }
+.content { max-width: 1000px; margin: 0 auto; padding: 18px 20px 90px; }
+.stats-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+.stat-card { flex: 1; min-width: 150px; background: #fff; border: 1px solid #e2e8e3; border-radius: 12px; padding: 12px 16px; display: flex; flex-direction: column; gap: 2px; }
+.stat-num { font-size: 22px; font-weight: 800; color: #00A94F; }
+.stat-label { font-size: 12px; color: #6d7d74; font-weight: 600; }
+.controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 14px 0 8px; }
+.seg { display: inline-flex; border: 1px solid #c9d5cd; border-radius: 8px; overflow: hidden; background: #fff; }
+.seg-btn { border: none; background: transparent; font-size: 13px; font-weight: 700; padding: 8px 14px; cursor: pointer; color: #294f3c; font-family: inherit; }
+.seg-btn.aktiv { background: #00A94F; color: #fff; }
+.select, .search { border: 1px solid #c9d5cd; border-radius: 8px; padding: 8px 10px; font-size: 13.5px; font-family: inherit; background: #fff; }
+.search { flex: 1; min-width: 200px; }
+.check-label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #294f3c; cursor: pointer; }
+.aktiounen { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.btn-gen { display: inline-block; font-size: 12px; font-weight: 700; color: #00A94F; background: #eef3ef; border: 1px solid #c9d5cd; padding: 7px 13px; border-radius: 8px; cursor: pointer; text-decoration: none; font-family: inherit; }
+.btn-gen:disabled { opacity: 0.5; cursor: not-allowed; }
+.empty { padding: 36px; text-align: center; color: #6d7d74; font-size: 14px; background: #fff; border-radius: 12px; border: 1px solid #e2e8e3; }
+.error { color: #8a2b1f; }
+.dag { margin-bottom: 18px; }
+.dag-titel { font-size: 15px; font-weight: 800; color: #00A94F; margin: 0 0 6px; display: flex; align-items: center; gap: 10px; }
+.dag-haut .dag-titel { color: #8a5a12; }
+.haut-badge { font-size: 11px; font-weight: 800; color: #8a5a12; background: #fbe8c6; border: 1px solid #f0d29a; border-radius: 20px; padding: 2px 9px; }
+.dag-zuel { margin-left: auto; font-size: 12px; font-weight: 600; color: #6d7d74; }
+.table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e2e8e3; border-radius: 12px; overflow: hidden; }
+.table th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #6d7d74; background: #eef3ef; padding: 8px 12px; font-weight: 700; }
+.table td { padding: 10px 12px; font-size: 13.5px; border-top: 1px solid #eef1ef; vertical-align: top; }
+.cell-strong { font-weight: 700; }
+.cell-muted { color: #6d7d74; }
+.zaeit { white-space: nowrap; }
+.notiz { max-width: 320px; white-space: pre-wrap; font-size: 12.5px; }
+.pill { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px; background: #d7ecdd; color: #00733a; white-space: nowrap; }
+@media print {
+  .topbar-rechts, .controls, .aktiounen, .refresh-btn { display: none !important; }
+  body { background: #fff; }
+  .content { padding: 0; }
+  .dag { page-break-inside: avoid; }
+}
+</style>
+</body>
+</html>

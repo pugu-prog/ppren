@@ -238,6 +238,34 @@
   }
   try { fügGlackBäi(); } catch (e) { /* d'Glack däerf ni d'Säit oder d'Session-Kontroll blockéieren */ }
 
+  // Knäppchen "📅 Terminer" (NËMMEN Proffen): schnelle Zougrëff op d'Iwwersiicht vun de Terminer mat de Schüler.
+  function fügTerminerKnappBäi() {
+    if (rolle !== "Prof") return;
+    if (/terminer\.html$/.test(window.location.pathname)) return;
+    const a = document.createElement("a");
+    a.textContent = "📅 Terminer";
+    a.href = "terminer.html";
+    a.title = "Terminer mat de Schüler";
+    a.style.cssText = [
+      "position:fixed", "bottom:52px", "right:70px", "z-index:9999",
+      "background:#fff", "color:#00A94F", "border:1px solid #c9d5cd", "border-radius:20px",
+      "padding:8px 14px", "font-size:12px", "font-weight:700",
+      "font-family:-apple-system,'Segoe UI',Inter,Arial,sans-serif",
+      "text-decoration:none", "cursor:pointer", "box-shadow:0 2px 8px rgba(0,0,0,0.25)",
+    ].join(";");
+    let drun = false;
+    const bäisetzen = () => {
+      if (drun || !document.body) return;
+      drun = true;
+      document.body.appendChild(a);
+    };
+    document.addEventListener("DOMContentLoaded", bäisetzen);
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+      setTimeout(bäisetzen, 0);
+    }
+  }
+  try { fügTerminerKnappBäi(); } catch (e) { /* ni blockéieren */ }
+
   // Session am Hannergrond validéieren (ofgelaf Sessioune erausfannen), ouni
   // d'Säit ze blockéieren — bei Ongëltegkeet gëtt sanft op login.html geleet.
   // De Server ass déi eenzeg authoritativ Quell fir d'Roll: den initialen Check
