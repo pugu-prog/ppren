@@ -546,7 +546,7 @@ function App() {
                   </div>
                 </section>
               )}
-              <fieldset disabled={locked || plan.status.startsWith("Eingereicht")} className="form">
+              <fieldset disabled={locked} className="form">
                 <section className="card">
                   <h2>1. Grunddaten</h2>
                   <div className="grid2">
@@ -708,9 +708,13 @@ function App() {
                   </button>
                 )}
                 {!locked && plan.status.startsWith("Eingereicht") && (
+                  <button type="button" className="btn btn-primary" disabled={!plan.titel.trim() || syncing} onClick={() => senden(plan.status)}>
+                    {syncing ? "Späichert…" : "💾 Ännerungen späicheren"}
+                  </button>
+                )}
+                {!locked && plan.status.startsWith("Eingereicht") && (
                   <span className="pending-note">
-                    ⏳ Areecht a waart op de Betreier — nëmmen deen kann de Plang nach eng Kéier zur Bearbeitung opmaachen.
-                    Kontaktéier däi Betreier, wann s du eppes nach änneren wëlls.
+                    ⏳ Areecht a waart op de Betreier — du kanns de Plang awer nach änneren. Duerno „Ännerungen späicheren“ klicken.
                   </span>
                 )}
                 {locked && <span className="locked-note">🔒 Gesperrt — freigegeben und ins Suivi übernommen.</span>}
@@ -719,7 +723,7 @@ function App() {
               </div>
               {!locked && plan.status === "Entwurf" && (
                 <p className="field-hint" style={{ margin: "-6px 0 14px" }}>
-                  💾 <strong>Späicheren</strong> synchroniséiert de Plang mat Google Drive (den Betreier kann en dann nokucken), bleift awer op „Entwurf" — du kanns nach weiderschaffen. <strong>„Zur Genehmigung einreichen"</strong> spaart de Plang fir de Betreier a gëtt gespaart, bis en en nees opmécht.
+                  💾 <strong>Späicheren</strong> synchroniséiert de Plang mat Google Drive (den Betreier kann en dann nokucken), bleift awer op „Entwurf" — du kanns nach weiderschaffen. <strong>„Zur Genehmigung einreichen"</strong> mellt de Plang dem Betreier; du kanns en duerno nach änneren a nei späicheren.
                 </p>
               )}
               {syncError && <div className="sync-error">{syncError}</div>}
