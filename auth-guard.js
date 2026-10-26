@@ -2,7 +2,7 @@
  * PPREN Auth-Guard
  * ----------------
  * Op JIDDER geschützter Säit als éischt Script agebonnen (virun de React-Scripten).
- * Préift ob eng gëlteg Session existéiert; wa net, gëtt direkt op login.html
+ * Préift ob eng gëltege Session existéiert; wa net, gëtt direkt op login.html
  * geleet (mat "zréck"-Parameter, fir nom Umellen hei zréckzekommen).
  *
  * Setzt global "PPREN_SESSION" = { token, numm, rolle, klasse } zur Verfügung,
@@ -14,7 +14,7 @@
  *
  * WICHTEG: Proffen dierfen op JIDD Säit dran, och wa se eng aner Roll
  * (z.B. "Schüler") verlaangt — sou kann e Prof engem Schüler eng Säit
- * weisen/erklären oder am Numm vun engem Schüler eppes nokucken. Just
+ * weisen/esclären oder am Numm vun engem Schüler eppes nokucken. Just
  * ëmgedréint (Schüler op enger "Prof"-Säit) bleift gespaart.
  */
 (function () {
@@ -37,7 +37,7 @@
   if (erfuerdertRolle && rolle !== erfuerdertRolle && rolle !== "Prof") {
     // document.open() bricht d'Parsen vum ursprénglechen Dokument definitiv of
     // (net just document.write() eleng — dat géif nëmmen den Text asetzen an
-    // duerno de Rescht vun der Säit, inkl. spéider Script-Tags, TROTZDEM weider
+    // duerno de Rescht vun der Säit, inkl. spéiler Script-Tags, TROTZDEM weider
     // lueden/ausféieren, well de Wurf hei drënner just dëse Script-Block ofbrécht,
     // net d'ganzt Dokument).
     document.open();
@@ -112,9 +112,9 @@
   }
   fügOfmellKnäppchenBäi();
 
-  // Glack 🔔 (NËMMEN Proffen): zeigt Meldungen aus dem Backend (z.B. geplangt Rendez-vousen,
+  // Glack 🔔 (NËMME Proffen): zeigt Meldungen aus dem Backend (z.B. geplangt Rendez-vousen,
   // Erënnerungen) mat Zuel vun den neien. Hänkt sech selwer op all Prof-Säit, ouni dass
-  // eng Säit enzel ugepasst muss ginn. Fehler hei blockéieren ni d'Säit.
+  // eng Säit enzel ugepasst muss ginn. Fehler hei blockqéieren ni d'Säit.
   function fügGlackBäi() {
     if (rolle !== "Prof") return;
     const API = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
@@ -236,9 +236,9 @@
       setTimeout(bäisetzen, 0);
     }
   }
-  try { fügGlackBäi(); } catch (e) { /* d'Glack däerf ni d'Säit oder d'Session-Kontroll blockéieren */ }
+  try { fügGlackBäi(); } catch (e) { /* d'Glack däerf ni d'Säit oder d'Session-Kontroll blockqéieren */ }
 
-  // Knäppchen "📅 Terminer" (NËMMEN Proffen): schnelle Zougrëff op d'Iwwersiicht vun de Terminer mat de Schüler.
+  // Knäppchen "📅 Terminer" (NËMME Proffen): schnelle Zougrëff op d'Iwwersiicht vun de Terminer mat de Schüler.
   function fügTerminerKnappBäi() {
     if (rolle !== "Prof") return;
     if (/terminer\.html$/.test(window.location.pathname)) return;
@@ -264,13 +264,41 @@
       setTimeout(bäisetzen, 0);
     }
   }
-  try { fügTerminerKnappBäi(); } catch (e) { /* ni blockéieren */ }
+  try { fügTerminerKnappBäi(); } catch (e) { /* ni blockqéieren */ }
+
+  // Knäppchen "🎯 Virbereeden" (NËMME Proffen): Dossier + gezielt Froen pro Schüler fir d'Zwëschegespréicher.
+  function fügVirbereedungKnappBäi() {
+    if (rolle !== "Prof") return;
+    if (/vorbereitung\.html$/.test(window.location.pathname)) return;
+    const a = document.createElement("a");
+    a.textContent = "🎯 Virbereeden";
+    a.href = "vorbereitung.html";
+    a.title = "Gespréicher virbereeden";
+    a.style.cssText = [
+      "position:fixed", "bottom:52px", "right:176px", "z-index:9999",
+      "background:#fff", "color:#00A94F", "border:1px solid #c9d5cd", "border-radius:20px",
+      "padding:8px 14px", "font-size:12px", "font-weight:700",
+      "font-family:-apple-system,'Segoe UI',Inter,Arial,sans-serif",
+      "text-decoration:none", "cursor:pointer", "box-shadow:0 2px 8px rgba(0,0,0,0.25)",
+    ].join(";");
+    let drun = false;
+    const bäisetzen = () => {
+      if (drun || !document.body) return;
+      drun = true;
+      document.body.appendChild(a);
+    };
+    document.addEventListener("DOMContentLoaded", bäisetzen);
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+      setTimeout(bäisetzen, 0);
+    }
+  }
+  try { fügVirbereedungKnappBäi(); } catch (e) { /* ni blockqéieren */ }
 
   // Session am Hannergrond validéieren (ofgelaf Sessioune erausfannen), ouni
-  // d'Säit ze blockéieren — bei Ongëltegkeet gëtt sanft op login.html geleet.
+  // d'Säit ze blockqéieren — bei Ongëltegkeet gëtt sanft op login.html geleet.
   // De Server ass déi eenzeg authoritativ Quell fir d'Roll: den initialen Check
   // hei driwwer baséiert nëmmen op localStorage, dat kann ëmgeängt ginn (z.B. iwwer
-  // DevTools). Dofir gëtt d'Roll hei mat der Server-Äntwert ofgeglach a lokal
+  // DevTools). Dofir gëtt d'Roll hei mat der Server-Äntwert ofgegläich a lokal
   // korrigéiert/geläscht, wann se net iwwerteneestëmmen.
   const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
   fetch(WEB_APP_URL, {
@@ -307,5 +335,5 @@
         localStorage.setItem("ppren_klasse", data.klasse || "");
       }
     })
-    .catch(() => {}); // Bei Netzwerkfehler: Säit bleift nutzbar, näischt blockéieren
+    .catch(() => {}); // Bei Netzwerkfehler: Säit bleift nutzbar, näischt blockqéieren
 })();
