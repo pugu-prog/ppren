@@ -296,6 +296,8 @@ function App() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
+  const [editId, setEditId] = useState(null);
+  const [editDraft, setEditDraft] = useState(null);
 
   // Auto-Plangung
   const [klass, setKlass] = useState("");
@@ -443,6 +445,45 @@ function App() {
       lade();
     } catch (e) {
       alert("Konnte net läschen: " + e.message);
+    }
+  };
+
+  const startEdit = (r) => {
+    setEditId(r.ID);
+    setEditDraft({
+      datum: dmyZuIso(r.Datum),
+      zaeit: istZaeit(r.Zäit) ? r.Zäit : "",
+      dauer: r.Dauer || DAUER_STANDARD[r.Typ] || 10,
+      notiz: r.Notiz || "",
+      rvTyp: r.Typ,
+    });
+  };
+
+  const änneren = async () => {
+    if (!editDraft || !editDraft.datum) return;
+    setSyncing(true);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          typ: "rendezvousAendern", id: editId, token: window.PPREN_SESSION?.token || "",
+          datum: isoZuDmy(editDraft.datum), zaeit: editDraft.zaeit,
+          dauer: editDraft.zaeit ? Number(editDraft.dauer) || "" : "",
+          notiz: editDraft.notiz, rvTyp: editDraft.rvTyp,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      setToast("Rendez-vous geännert");
+      setEditId(null);
+      setEditDraft(null);
+      lade();
+    } catch (e) {
+      setToast("⚠️ Konnte net änneren: " + e.message);
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setToast(null), 5000);
     }
   };
 
@@ -693,16 +734,37 @@ function App() {
           {!loading && nurZukunft.length === 0 && <p className="notice">Nach keng geplangt.</p>}
           {!loading && nurZukunft.length > 0 && (
             <table className="tabelle">
-              <thead><tr><th>Datum</th><th>Zäit</th><th>Schüler/-in</th><th>Typ</th><th>Erënnert?</th><th></th><th></th></tr></thead>
+              <thead><tr><th>Datum</th><th>Zäit</th><th>Schüler/-in</th><th>Typ</th><th>Erënnert?</th><th></th><th></th><th></th></tr></thead>
               <tbody>
-                {nurZukunft.map((r, i) => (
+                {nurZukunft.map((r, i) => editId === r.ID && editDraft ? (
+                  <tr key={i} className="rv-edit">
+                    <td><input type="date" className="input" value={editDraft.datum} onChange={(e) => setEditDraft({ ...editDraft, datum: e.target.value })} /></td>
+                    <td>
+                      <input type="time" className="input" value={editDraft.zaeit} onChange={(e) => setEditDraft({ ...editDraft, zaeit: e.target.value })} />
+                      <input type="number" min="5" step="1" className="input" title="Dauer (Min.)" value={editDraft.dauer} onChange={(e) => setEditDraft({ ...editDraft, dauer: e.target.value })} />
+                    </td>
+                    <td>{ufweis(r.Schüler)}</td>
+                    <td>
+                      <select className="input" value={editDraft.rvTyp} onChange={(e) => setEditDraft({ ...editDraft, rvTyp: e.target.value })}>
+                        <option value="Fachgespréich">Fachgespréich</option>
+                        <option value="Ziel-Iwwerpréiwung">Ziel-Iwwerpréiwung</option>
+                      </select>
+                    </td>
+                    <td colSpan={2}><input type="text" className="input" placeholder="Notiz" value={editDraft.notiz} onChange={(e) => setEditDraft({ ...editDraft, notiz: e.target.value })} /></td>
+                    <td colSpan={2}>
+                      <button className="btn btn-primary" disabled={syncing} onClick={änneren}>💾 Späicheren</button>
+                      <button className="btn-gen" onClick={() => { setEditId(null); setEditDraft(null); }}>Ofbriechen</button>
+                    </td>
+                  </tr>
+                ) : (
                   <tr key={i}>
                     <td>{r.Datum || "–"}</td>
                     <td>{istZaeit(r.Zäit) ? r.Zäit + (r.Dauer ? `–${zaeitVun(minVun(r.Zäit) + Number(r.Dauer))}` : "") : "–"}</td>
-                    <td>{ufweis(r.Schüler)}</td>
+                    <td>{ufweis(r.Schüler)}{r.Notiz ? <div className="rv-notiz">📝 {r.Notiz}</div> : null}</td>
                     <td>{r.Typ}</td>
                     <td><span className={`pill ${r.Erënnert === "Jo" ? "pill-done" : "pill-pending"}`}>{r.Erënnert === "Jo" ? "Jo" : "Nach net"}</span></td>
                     <td><button className="icon-btn icon-btn-kal" onClick={() => exportEent(r)} title="Als .ics exportéieren">📅</button></td>
+                    <td><button className="icon-btn icon-btn-kal" onClick={() => startEdit(r)} title="Rendez-vous änneren">✏️</button></td>
                     <td><button className="icon-btn" onClick={() => läschen(r.ID)}>✕</button></td>
                   </tr>
                 ))}
@@ -765,6 +827,9 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .pill-done { background: #d7ecdd; color: #00A94F; }
 .icon-btn { border: none; background: transparent; color: #99392f; cursor: pointer; font-size: 13px; width: 24px; height: 24px; border-radius: 6px; }
 .icon-btn-kal { color: #4576B5; }
+.rv-notiz { font-size: 11px; color: #6b776f; margin-top: 2px; }
+.rv-edit .input { margin: 0 0 4px; min-width: 110px; }
+.rv-edit .btn, .rv-edit .btn-gen { margin-right: 6px; }
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1c2621; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; }
 .grid3 { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 14px; }
 .grid-tight { gap: 8px; }
