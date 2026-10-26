@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" type="image/png" href="LogoSE_weisHintergrund.png" />
+<title>PPREN Gespräche vorbereiten</title>
+<script>window.PPREN_ERFUERDERT_ROLLE = "Prof";</script>
+<script src="auth-guard.js"></script>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, 'Segoe UI', Inter, Arial, sans-serif; background: #f3f6f4; color: #1f2a24; font-size: 14px; }
+header { background: #00A94F; color: #fff; padding: 14px 20px; }
+header h1 { margin: 0; font-size: 18px; }
+header p { margin: 2px 0 0; font-size: 12.5px; opacity: .92; }
+main { max-width: 980px; margin: 0 auto; padding: 16px; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; background: #fff; border: 1px solid #dfe6e1; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+.bar label { font-size: 12.5px; color: #4a574f; display: flex; align-items: center; gap: 6px; }
+.bar input[type=date], .bar select { padding: 6px 8px; border: 1px solid #c9d5cd; border-radius: 8px; font: inherit; }
+.btn { border: 1px solid #c9d5cd; background: #fff; color: #00A94F; border-radius: 20px; padding: 7px 14px; font-weight: 700; font-size: 12.5px; cursor: pointer; text-decoration: none; }
+.ablauf { background: #eaf6ee; border: 1px solid #cfe8d7; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; }
+.ablauf b { color: #00753a; }
+.card { background: #fff; border: 1px solid #dfe6e1; border-radius: 14px; padding: 16px 18px; margin-bottom: 16px; }
+.card h2 { margin: 0; font-size: 17px; }
+.kopf { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; border-bottom: 2px solid #e5ece7; padding-bottom: 8px; margin-bottom: 10px; }
+.zeit { font-weight: 800; color: #00753a; font-size: 15px; }
+.meta { color: #55625a; font-size: 12.5px; }
+.pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; background: #e6e9e6; color: #55625a; }
+.pill.rout { background: #f8dcd8; color: #99392f; }
+.pill.gro { background: #d7ecdd; color: #00753a; }
+.pill.giel { background: #fbefc9; color: #7a5d00; }
+h3 { margin: 12px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #00753a; }
+ul { margin: 0; padding-left: 18px; }
+li { margin: 3px 0; }
+.rout { color: #99392f; }
+.klee { color: #6b776f; font-size: 12.5px; }
+.zitat { background: #f6f8f7; border-left: 3px solid #c9d5cd; padding: 6px 10px; margin: 4px 0; font-size: 12.5px; color: #3c4a42; }
+.fragen li { margin: 5px 0; }
+.leer { color: #6b776f; font-style: italic; }
+@media print {
+  body { background: #fff; }
+  header, .bar, .ablauf, .btn, #auth-knaepp { display: none !important; }
+  main { max-width: none; padding: 0; }
+  .card { page-break-after: always; border: none; padding: 0; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎯 Gespréicher virbereeden</h1>
+  <p>Pro Schüler: Stand, Auffälligkeiten, gezielte Fragen — aus den Daten im Tool. Nur für Lehrpersonen.</p>
+</header>
+<main>
+  <div class="bar">
+    <label>Datum <input type="date" id="datum" /></label>
+    <label>Typ
+      <select id="typ">
+        <option value="">Alle</option>
+        <option value="Ziel-Iwwerpréiwung">Ziel-Iwwerpréiwung</option>
+        <option value="Fachgespréich">Fachgespréich</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="alleSchueler" /> Alle Schüler weisen</label>
+    <button class="btn" id="drock">🖨️ Drock / PDF</button>
+    <a class="btn" href="zieluewerpreiwung.html">📝 Ziler iwwerpréiwen</a>
+    <a class="btn" href="terminer.html">📅 Terminer</a>
+  </div>
+  <div class="ablauf"><b>10 Minuten:</b> 2′ Schüler berichtet (Stand) · 2′ Meilenstein / Beleg zeigen lassen · 3′ gezielte Fragen · 2′ nächste Schritte vereinbaren · 1′ Rückmeldung. Bewertet wird: Fortschritt seit letzter Etappe, Zielerreichung, Autonomie, Umgang mit Problemen, nächster Schritt.</div>
+  <div id="inhalt"><p class="leer">Lädt…</p></div>
+</main>
+<script>
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function kuerz(s, n) {
+  const t = String(s == null ? "" : s).replace(/\s+/g, " ").trim();
+  return t.length > n ? t.slice(0, n - 1).trimEnd() + "…" : t;
+}
+function pad(n) { return String(n).padStart(2, "0"); }
+function isoVunDatum(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+function dmyZuIso(dmy) {
+  const m = String(dmy || "").match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  return m ? m[3] + "-" + pad(m[1]) + "-" + pad(m[2]) : "";
+}
+function isoZuDmy(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[3] + "." + m[2] + "." + m[1] : "";
+}
+function kurzDatum(iso) { const m = String(iso || "").match(/^\d{4}-(\d{2})-(\d{2})/); return m ? m[2] + "." + m[1] + "." : ""; }
+function istZaeit(z) { return /^\d{1,2}:\d{2}$/.test(String(z || "")); }
+function minVun(z) { const [h, m] = String(z).split(":"); return Number(h) * 60 + Number(m); }
+function zaeitVun(min) { return pad(Math.floor(min / 60)) + ":" + pad(min % 60); }
+function isoPlus(iso, tage) { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + tage); return isoVunDatum(d); }
+function montagVun(iso) { const d = new Date(iso + "T12:00:00"); const w = (d.getDay() + 6) % 7; d.setDate(d.getDate() - w); return isoVunDatum(d); }
+function jsonSécher(s, fallback) { try { return JSON.parse(s || ""); } catch (e) { return fallback; } }
+function offenerStatus(st) { return !/(fäerdeg|erreecht|erreech|erledegt|erledigt|done|geschafft|fertig)/i.test(String(st || "")); }
+
+/** Baut d'Dossier vun engem Schüler aus de Server-Daten. heut = ISO-Datum vum Dag. */
+function baueDossier(daten, id, heut) {
+  const projekt = (daten.projekte || []).find((p) => p["Schüler"] === id) || null;
+  const det = projekt ? jsonSécher(projekt["Projektplan-Details (JSON)"], {}) : {};
+  const wbAlles = (daten.wochenberichte || []).filter((w) => w["Schüler"] === id);
+  const wb = wbAlles.map((w) => ({ w, start: dmyZuIso(String(w.Woche || "").split("–")[0].trim()) })).sort((a, b) => a.start.localeCompare(b.start));
+  const msZeil = (daten.meilensteng || []).find((m) => m["Schüler"] === id);
+  const msRoh = msZeil ? jsonSécher(msZeil["Meilensteng (JSON)"], []) : [];
+  const gesinn = new Set();
+  const meilensteng = msRoh.filter((m) => m && m.datum && m.titel).filter((m) => {
+    const k = m.datum + "|" + String(m.titel).trim();
+    if (gesinn.has(k)) return false;
+    gesinn.add(k);
+    return true;
+  }).sort((a, b) => String(a.datum).localeCompare(String(b.datum)));
+  const kommentarer = (daten.plangKommentarer || []).filter((k) => k["Schüler"] === id && !/suite demande/i.test(k.Text || ""));
+  const budget = (daten.budget || []).find((b) => b["Schüler"] === id) || null;
+
+  const auffaellig = [];
+  const fragen = [];
+
+  // Projektplan
+  const status = projekt ? String(projekt.Status || "") : "";
+  if (!projekt) auffaellig.push({ rout: true, text: "Kee Projektplang am Tool." });
+  else if (/entwurf/i.test(status)) auffaellig.push({ rout: true, text: "Projektplan noch NICHT eingereicht (Entwurf, zuletzt geändert " + kurzDatum(String(projekt["Zuletzt aktualisiert"] || "").slice(0, 10)) + ")." });
+  else if (/eingereicht/i.test(status)) auffaellig.push({ text: "Projektplan eingereicht, wartet auf Freigabe." });
+
+  // Offene Plan-Hinweise
+  const offen = [];
+  const gesinnText = new Set();
+  kommentarer.filter((k) => k.Erledegt !== "Jo").forEach((k) => {
+    const t = kuerz(k.Text, 150);
+    if (gesinnText.has(t)) return;
+    gesinnText.add(t);
+    offen.push(t);
+  });
+  if (offen.length) auffaellig.push({ rout: true, text: "Offene Plan-Hinweise (" + offen.length + "): " + offen.slice(0, 4).join(" · ") });
+
+  // Kostenplan / Budget
+  const kosten = Array.isArray(det.kosten) ? det.kosten : jsonSécher(det.kosten, []);
+  if (det.kostenplanNoetig) {
+    const ohneBetrag = kosten.filter((k) => !(parseFloat(k.betrag) > 0));
+    const summe = kosten.reduce((a, k) => a + Math.max(0, parseFloat(k.betrag) || 0), 0);
+    if (ohneBetrag.length) auffaellig.push({ rout: true, text: "Kostenplan: " + ohneBetrag.length + " Position(en) ohne Betrag (" + ohneBetrag.slice(0, 4).map((k) => kuerz(k.bezeichnung, 40)).join(", ") + ")." });
+    const max = budget ? Number(budget.Max) || 0 : 0;
+    if (!budget && summe > 0) auffaellig.push({ text: "Kein Budget-Eintrag, Kostenplan " + Math.round(summe) + " €." });
+    else if (budget && summe > max) auffaellig.push({ rout: true, text: "Kostenplan " + Math.round(summe) + " € über Budget " + max + " €." });
+    else if (summe > 0) auffaellig.push({ text: "Kostenplan " + Math.round(summe) + " € (Budget " + max + " €)." });
+  }
+
+  // Wochenberichte: fehlende Wochen seit 21.09.2026
+  const vorhanden = new Set(wb.map((x) => x.start));
+  const fehlend = [];
+  for (let m = "2026-09-21"; isoPlus(m, 6) < heut; m = isoPlus(m, 7)) {
+    if (!vorhanden.has(m)) fehlend.push(kurzDatum(m) + "–" + kurzDatum(isoPlus(m, 6)));
+  }
+  if (fehlend.length) auffaellig.push({ rout: true, text: "Wochenbericht fehlt: " + fehlend.join(", ") });
+  const letzte = wb.length ? wb[wb.length - 1].w : null;
+  const letzterKomm = [...wb].reverse().map((x) => x.w).find((w) => String(w.Kommentar || "").trim());
+  if (letzterKomm) auffaellig.push({ text: "Dein letzter Kommentar zum Wochenbericht (" + esc(letzterKomm.Woche) + "): „" + kuerz(letzterKomm.Kommentar, 220) + "“", rawHtml: true });
+
+  // Meilensteine
+  const offeneMs = meilensteng.filter((m) => offenerStatus(m.status));
+  const ueberfaellig = offeneMs.filter((m) => m.datum < heut);
+  const heutMs = offeneMs.filter((m) => m.datum === heut);
+  const kommend = offeneMs.filter((m) => m.datum > heut && m.datum <= isoPlus(heut, 28));
+  if (ueberfaellig.length) auffaellig.push({ rout: true, text: ueberfaellig.length + " Meilenstein(e) überfällig und im Tool nicht abgehakt (kann auch nur nicht aktualisiert sein)." });
+  if (!meilensteng.length) auffaellig.push({ rout: true, text: "Keine Meilensteine im Tool." });
+  const planMs = Array.isArray(det.meilensteine) ? det.meilensteine : jsonSécher(det.meilensteine, []);
+  const daten2 = planMs.map((m) => m.datum).filter(Boolean);
+  if (daten2.some((d, i) => i > 0 && d < daten2[i - 1])) auffaellig.push({ text: "Meilensteine im Plan nicht in zeitlicher Reihenfolge." });
+
+  // Fragen
+  fragen.push({ kopf: "Fortschritt", text: letzte ? "Was ist seit dem letzten Bericht (Woche " + esc(letzte.Woche) + ") passiert — konkret, mit Beleg?" : "Was hast du bisher konkret gemacht — mit Beleg?" });
+  heutMs.concat(ueberfaellig.slice(-2)).slice(0, 3).forEach((m) => {
+    fragen.push({ kopf: "Zielerreichung", text: "Meilenstein „" + esc(kuerz(m.titel, 90)) + "“ (" + kurzDatum(m.datum) + ") — erreicht? Zeig es mir." });
+  });
+  if (!heutMs.length && !ueberfaellig.length) fragen.push({ kopf: "Zielerreichung", text: "Welche Ziele aus deinem Plan sind bisher erreicht, und woran siehst du das?" });
+  fragen.push({ kopf: "Probleme", text: "Wo hängt es gerade? Was hat nicht geklappt, und was hast du dagegen unternommen?" });
+  fragen.push({ kopf: "Autonomie", text: "Was hast du selbst entschieden oder organisiert — und wobei hast du Hilfe geholt?" });
+  if (/entwurf/i.test(status)) fragen.push({ kopf: "Projektplan", text: "Wann reichst du den Plan ein? Was fehlt noch (Aufgaben, Meilensteine, Kostenplan)?" });
+  else if (offen.length) fragen.push({ kopf: "Projektplan", text: "Offene Hinweise zum Plan: bis wann arbeitest du sie ab?" });
+  if (kosten.some((k) => !(parseFloat(k.betrag) > 0)) && det.kostenplanNoetig) fragen.push({ kopf: "Kostenplan", text: "Preise nachtragen: welche Positionen sind noch offen, was ist schon vorhanden/geliehen?" });
+  const naechster = kommend[0];
+  fragen.push({ kopf: "Nächster Schritt", text: naechster ? "Nächster Meilenstein: „" + esc(kuerz(naechster.titel, 90)) + "“ (" + kurzDatum(naechster.datum) + ") — was brauchst du bis dahin, und was machst du diese Woche?" : "Was ist dein konkreter nächster Schritt bis zum nächsten Termin?" });
+
+  return { id, projekt, det, status, wbAnzahl: wb.length, letzte, auffaellig, fragen, ueberfaellig, heutMs, kommend };
+}
+
+function termineFir(daten, iso, typ) {
+  return (daten.rendezvousen || [])
+    .filter((r) => dmyZuIso(r.Datum) === iso && (!typ || r.Typ === typ))
+    .sort((a, b) => String(a["Zäit"] || "").localeCompare(String(b["Zäit"] || "")));
+}
+
+function zeichneKaart(daten, id, heut, termin) {
+  const d = baueDossier(daten, id, heut);
+  const person = (daten.personen || []).find((p) => p.numm === id);
+  const name = person && person.virnumm ? person.virnumm : id;
+  const klasse = d.projekt ? d.projekt.Klasse : (person ? person.klasse : "");
+  let zeit = "";
+  if (termin && istZaeit(termin["Zäit"])) zeit = termin["Zäit"] + (termin.Dauer ? "–" + zaeitVun(minVun(termin["Zäit"]) + Number(termin.Dauer)) : "");
+  const pillKlass = /entwurf/i.test(d.status) ? "rout" : /eingereicht/i.test(d.status) ? "giel" : "gro";
+  const ziel = d.det && d.det.ziele ? kuerz(String(d.det.ziele).replace(/^"|"$/g, "").replace(/\\n/g, " "), 320) : "";
+  let h = '<div class="card">';
+  h += '<div class="kopf"><div><h2>' + esc(name) + ' <span class="meta">' + esc(id) + " · " + esc(klasse) + "</span></h2>";
+  h += '<div class="meta">' + (d.projekt ? "„" + esc(d.projekt.Titel) + "“" : "") + " · Betreuer: " + esc(d.projekt ? d.projekt.Betreuer : "–") + "</div></div>";
+  h += '<div style="text-align:right">' + (zeit ? '<div class="zeit">' + esc(zeit) + "</div>" : "") + (termin ? '<div class="meta">' + esc(termin.Typ) + "</div>" : "") + '<span class="pill ' + pillKlass + '">' + esc(d.status || "–") + "</span></div></div>";
+  h += "<h3>Stand</h3><ul>";
+  h += "<li>Wochenberichte: <b>" + d.wbAnzahl + "</b>" + (d.letzte ? " · letzter: " + esc(d.letzte.Woche) : "") + "</li>";
+  if (d.letzte) {
+    if (d.letzte.Fortschritt) h += '<li class="klee">Fortschritt laut Bericht: „' + esc(kuerz(d.letzte.Fortschritt, 260)) + "“</li>";
+    else if (d.letzte.Zusammenfassung) h += '<li class="klee">Zusammenfassung: „' + esc(kuerz(d.letzte.Zusammenfassung, 260)) + "“</li>";
+  }
+  if (ziel) h += '<li class="klee">Ziele im Plan: ' + esc(ziel) + "</li>";
+  h += "</ul>";
+  const msTxt = (m) => esc(kurzDatum(m.datum)) + " " + esc(kuerz(m.titel, 80));
+  if (d.heutMs.length || d.ueberfaellig.length || d.kommend.length) {
+    h += "<h3>Meilensteine</h3><ul>";
+    d.heutMs.forEach((m) => { h += "<li><b>heute fällig:</b> " + msTxt(m) + "</li>"; });
+    d.ueberfaellig.slice(-4).forEach((m) => { h += '<li class="rout">überfällig/offen: ' + msTxt(m) + "</li>"; });
+    d.kommend.slice(0, 3).forEach((m) => { h += "<li>kommend: " + msTxt(m) + "</li>"; });
+    h += "</ul>";
+  }
+  if (d.auffaellig.length) {
+    h += "<h3>Auffälligkeiten</h3><ul>";
+    d.auffaellig.forEach((a) => { h += "<li" + (a.rout ? ' class="rout"' : "") + ">" + (a.rawHtml ? a.text : esc(a.text)) + "</li>"; });
+    h += "</ul>";
+  }
+  h += '<h3>Gezielte Fragen</h3><ul class="fragen">';
+  d.fragen.forEach((f) => { h += "<li><b>" + esc(f.kopf) + ":</b> " + f.text + "</li>"; });
+  h += "</ul></div>";
+  return h;
+}
+
+function zeichneAlles(daten) {
+  const iso = document.getElementById("datum").value;
+  const typ = document.getElementById("typ").value;
+  const alle = document.getElementById("alleSchueler").checked;
+  const termine = termineFir(daten, iso, typ);
+  const schueler = (daten.personen || []).filter((p) => p.rolle === "Schüler");
+  let h = "";
+  if (!alle && termine.length) {
+    termine.forEach((t) => { h += zeichneKaart(daten, t["Schüler"], iso, t); });
+  } else {
+    if (!alle) h += '<p class="leer">Keine Termine am ' + esc(isoZuDmy(iso)) + (typ ? " (" + esc(typ) + ")" : "") + " — alle Schüler:</p>";
+    schueler.forEach((p) => { h += zeichneKaart(daten, p.numm, iso, null); });
+  }
+  document.getElementById("inhalt").innerHTML = h || '<p class="leer">Nichts gefunden.</p>';
+}
+
+(function start() {
+  const datumFeld = document.getElementById("datum");
+  datumFeld.value = isoVunDatum(new Date());
+  document.getElementById("drock").addEventListener("click", () => window.print());
+  let daten = null;
+  const neiZeechnen = () => { if (daten) zeichneAlles(daten); };
+  ["datum", "typ", "alleSchueler"].forEach((i) => document.getElementById(i).addEventListener("change", neiZeechnen));
+  const token = (window.PPREN_SESSION && window.PPREN_SESSION.token) || "";
+  fetch(WEB_APP_URL + "?token=" + encodeURIComponent(token))
+    .then((r) => r.json())
+    .then((d) => {
+      if (!d || d.ok === false) throw new Error((d && d.error) || "Keng Daten");
+      daten = d;
+      zeichneAlles(daten);
+    })
+    .catch((e) => {
+      document.getElementById("inhalt").innerHTML = '<p class="rout">Konnt d\'Daten net lueden: ' + esc(e.message) + "</p>";
+    });
+})();
+</script>
+</body>
+</html>
