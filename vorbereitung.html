@@ -35,7 +35,8 @@ li { margin: 3px 0; }
 .rout { color: #99392f; }
 .klee { color: #6b776f; font-size: 12.5px; }
 .zitat { background: #f6f8f7; border-left: 3px solid #c9d5cd; padding: 6px 10px; margin: 4px 0; font-size: 12.5px; color: #3c4a42; }
-.fragen li { margin: 5px 0; }
+.fragen li { margin: 4px 0; }
+.krit { margin: 8px 0; }
 .leer { color: #6b776f; font-style: italic; }
 @media print {
   body { background: #fff; }
@@ -95,6 +96,13 @@ function zaeitVun(min) { return pad(Math.floor(min / 60)) + ":" + pad(min % 60);
 function isoPlus(iso, tage) { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + tage); return isoVunDatum(d); }
 function montagVun(iso) { const d = new Date(iso + "T12:00:00"); const w = (d.getDay() + 6) % 7; d.setDate(d.getDate() - w); return isoVunDatum(d); }
 function jsonSécher(s, fallback) { try { return JSON.parse(s || ""); } catch (e) { return fallback; } }
+const KRITAEREN = [
+  { name: "Fortschrëtt zënter der leschter Etapp", tipp: "Neues, sichtbares Ergebnis seit dem letzten Termin?" },
+  { name: "Erreechung vun de gesate Ziler", tipp: "Meilensteine/Ziele aus dem Plan erreicht, mit Beleg?" },
+  { name: "Autonomie / Eegenstännegkeet bei der Ëmsetzung", tipp: "Eigene Entscheidungen, selbst organisiert, gezielt Hilfe geholt?" },
+  { name: "Ëmgang mat opgetruedene Problemer", tipp: "Probleme benannt und selbst Lösungen versucht?" },
+  { name: "Nächst Schrëtt sënnvoll geplangt", tipp: "Konkret, realistisch, mit Datum?" },
+];
 function offenerStatus(st) { return !/(fäerdeg|erreecht|erreech|erledegt|erledigt|done|geschafft|fertig)/i.test(String(st || "")); }
 
 /** Baut d'Dossier vun engem Schüler aus de Server-Daten. heut = ISO-Datum vum Dag. */
@@ -169,19 +177,20 @@ function baueDossier(daten, id, heut) {
   const daten2 = planMs.map((m) => m.datum).filter(Boolean);
   if (daten2.some((d, i) => i > 0 && d < daten2[i - 1])) auffaellig.push({ text: "Meilensteine im Plan nicht in zeitlicher Reihenfolge." });
 
-  // Fragen
-  fragen.push({ kopf: "Fortschritt", text: letzte ? "Was ist seit dem letzten Bericht (Woche " + esc(letzte.Woche) + ") passiert — konkret, mit Beleg?" : "Was hast du bisher konkret gemacht — mit Beleg?" });
+  // Fragen: genau déi 5 Krituiäre vun der Ziel-Iwwerpréiwung (keng Fachfroen)
+  const kosten0 = det.kostenplanNoetig && kosten.some((k) => !(parseFloat(k.betrag) > 0));
+  fragen.push({ krit: 0, text: letzte ? "Was ist seit dem letzten Bericht (Woche " + esc(letzte.Woche) + ") konkret passiert? Zeig mir das Ergebnis." : "Was hast du bisher konkret gemacht? Zeig mir das Ergebnis." });
   heutMs.concat(ueberfaellig.slice(-2)).slice(0, 3).forEach((m) => {
-    fragen.push({ kopf: "Zielerreichung", text: "Meilenstein „" + esc(kuerz(m.titel, 90)) + "“ (" + kurzDatum(m.datum) + ") — erreicht? Zeig es mir." });
+    fragen.push({ krit: 1, text: "Meilenstein „" + esc(kuerz(m.titel, 90)) + "“ (" + kurzDatum(m.datum) + ") — erreicht? Woran siehst du das?" });
   });
-  if (!heutMs.length && !ueberfaellig.length) fragen.push({ kopf: "Zielerreichung", text: "Welche Ziele aus deinem Plan sind bisher erreicht, und woran siehst du das?" });
-  fragen.push({ kopf: "Probleme", text: "Wo hängt es gerade? Was hat nicht geklappt, und was hast du dagegen unternommen?" });
-  fragen.push({ kopf: "Autonomie", text: "Was hast du selbst entschieden oder organisiert — und wobei hast du Hilfe geholt?" });
-  if (/entwurf/i.test(status)) fragen.push({ kopf: "Projektplan", text: "Wann reichst du den Plan ein? Was fehlt noch (Aufgaben, Meilensteine, Kostenplan)?" });
-  else if (offen.length) fragen.push({ kopf: "Projektplan", text: "Offene Hinweise zum Plan: bis wann arbeitest du sie ab?" });
-  if (kosten.some((k) => !(parseFloat(k.betrag) > 0)) && det.kostenplanNoetig) fragen.push({ kopf: "Kostenplan", text: "Preise nachtragen: welche Positionen sind noch offen, was ist schon vorhanden/geliehen?" });
+  if (!heutMs.length && !ueberfaellig.length) fragen.push({ krit: 1, text: "Welche deiner Ziele sind bisher erreicht, und woran siehst du das?" });
+  fragen.push({ krit: 2, text: "Was hast du selbst entschieden oder organisiert — und wobei hast du Hilfe geholt?" });
+  fragen.push({ krit: 3, text: "Wo hängt es gerade? Was hat nicht geklappt, und was hast du dagegen unternommen?" });
+  if (kosten0) fragen.push({ krit: 3, text: "Kosten: welche Teile oder Preise sind noch offen, und was ist schon vorhanden oder geliehen?" });
+  if (/entwurf/i.test(status)) fragen.push({ krit: 4, text: "Wann reichst du den Plan ein? Was fehlt noch (Aufgaben, Meilensteine, Kostenplan)?" });
+  else if (offen.length) fragen.push({ krit: 4, text: "Offene Hinweise zum Plan: bis wann arbeitest du sie ab?" });
   const naechster = kommend[0];
-  fragen.push({ kopf: "Nächster Schritt", text: naechster ? "Nächster Meilenstein: „" + esc(kuerz(naechster.titel, 90)) + "“ (" + kurzDatum(naechster.datum) + ") — was brauchst du bis dahin, und was machst du diese Woche?" : "Was ist dein konkreter nächster Schritt bis zum nächsten Termin?" });
+  fragen.push({ krit: 4, text: naechster ? "Nächster Meilenstein: „" + esc(kuerz(naechster.titel, 90)) + "“ (" + kurzDatum(naechster.datum) + ") — was brauchst du bis dahin, und was machst du diese Woche?" : "Was ist dein konkreter nächster Schritt bis zum nächsten Termin?" });
 
   return { id, projekt, det, status, wbAnzahl: wb.length, letzte, auffaellig, fragen, ueberfaellig, heutMs, kommend };
 }
@@ -226,9 +235,15 @@ function zeichneKaart(daten, id, heut, termin) {
     d.auffaellig.forEach((a) => { h += "<li" + (a.rout ? ' class="rout"' : "") + ">" + (a.rawHtml ? a.text : esc(a.text)) + "</li>"; });
     h += "</ul>";
   }
-  h += '<h3>Gezielte Fragen</h3><ul class="fragen">';
-  d.fragen.forEach((f) => { h += "<li><b>" + esc(f.kopf) + ":</b> " + f.text + "</li>"; });
-  h += "</ul></div>";
+  h += "<h3>Fragen nach den 5 Bewertungskriterien</h3>";
+  KRITAEREN.forEach((k, i) => {
+    const fs = d.fragen.filter((f) => f.krit === i);
+    if (!fs.length) return;
+    h += '<div class="krit"><b>' + (i + 1) + ". " + esc(k.name) + '</b> <span class="klee">— ' + esc(k.tipp) + "</span><ul class=\"fragen\">";
+    fs.forEach((f) => { h += "<li>" + f.text + "</li>"; });
+    h += "</ul></div>";
+  });
+  h += "</div>";
   return h;
 }
 
