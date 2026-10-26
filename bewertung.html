@@ -566,7 +566,7 @@ function App() {
       }
 
       // KI-Virschlag fir de Projektplang (aus dem Plang-Check am Dashboard) — gëtt
-      // NET automatesch agedroen, de Prof iwwerhëllt en bewosst per Knäppchen.
+      // NET automatesch agedroen, de Prof iwwerhëlt en bewosst per Knäppchen.
       if ((s[p]?.gruppen || []).some((g) => (g.items || []).some((i) => i.name === "Projektplan"))) {
         try {
           const kiRes = await fetch(WEB_APP_URL, {
@@ -847,7 +847,7 @@ function App() {
         {def && !finalisiert && entworfGespäichert && !pruefeLaden && (
           <div className="card">
             <p className="notice notice-draft">
-              📝 Fir dës Period existiért scho e gespäichert<strong>Entworf</strong> — deen ass nach NET am Suivi vum
+              📝 Fir dës Period existéiert scho e gespäicherte <strong>Entworf</strong> — deen ass nach NET am Suivi vum
               Schüler ukomm. Dréckt op <strong>„✅ Validéieren“</strong>, soubal alles fäerdeg ass, fir en un de Schüler
               weiderzeginn.
             </p>
@@ -871,7 +871,7 @@ function App() {
                     <p className="notice notice-success">✅ Automatesch iwwerholl aus dem Fachgespréich-Tool ({fgInfo.datum}, Variante {fgInfo.variante}). Bäi Bedarf hei nach upassen.</p>
                   )}
                   {g.typ === "fachgespraech" && !fgInfo && (
-                    <p className="notice">ℹ️ Nach kee gespäichert Fachgespréich fonnt fir dës Period — manuell aginn oder éischt am Fachgespréich-Tool ausfëllen.</p>
+                    <p className="notice">ℹ️ Nach kee gespäichert Fachgespréich fonnt fir dës Period — manuell aginn oder éischt am Fachgespréich-Tool ausfëlen.</p>
                   )}
                   {(gruppiert[g.titel] || []).some((k) => k.name === "Bewältigung des Themas") && (
                     <div className="card-head-row">
@@ -883,7 +883,7 @@ function App() {
                     <p className="notice notice-success">✅ {zpInfo.summe}P automatesch aus {zpInfo.anzuel} Ziel-Iwwerpréiwung(en) iwwerholl fir "Bewältigung des Themas" — Autonomie-Undeel bäi Bedarf nach dobäi addéieren.</p>
                   )}
                   {(gruppiert[g.titel] || []).some((k) => k.name === "Bewältigung des Themas") && !zpInfo && (
-                    <p className="notice">ℹ️ Nach keng Ziel-Iwwerpréiwung fir dës Period gespäichert — manuell aginn oder éischt am Ziler-iwwerpréiwen-Tool ausfëllen.</p>
+                    <p className="notice">ℹ️ Nach keng Ziel-Iwwerpréiwung fir dës Period gespäichert — manuell aginn oder éischt am Ziler-iwwerpréiwen-Tool ausfëlen.</p>
                   )}
 
                   {(gruppiert[g.titel] || []).some((k) => k.name === "Projektplan") && kiPlangInfo && (
@@ -970,7 +970,7 @@ function App() {
 
                   <div className="kommentar-gen-row">
                     <button type="button" className="btn-gen" onClick={() => generiereGruppenKommentar(g)}>
-                      🖊️ Kommentar aus Remarquen generiéieren
+                      🖊️ Kommentar aus Remarquen generéieren
                     </button>
                   </div>
                   <textarea
@@ -1045,7 +1045,7 @@ function App() {
               </div>
               <div className="kommentar-gen-row">
                 <button type="button" className="btn-gen" onClick={generiereAllgemeinKommentar}>
-                  🖊️ Gesamtkommentar aus allen Remarquen generiéieren
+                  🖊️ Gesamtkommentar aus allen Remarquen generéieren
                 </button>
               </div>
               <textarea className="textarea gruppen-kommentar" rows={4} placeholder="Zusätzlicher freier Kommentar (optional)…" value={kommentar} onChange={(e) => setKommentar(e.target.value)} />
