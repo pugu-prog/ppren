@@ -84,6 +84,17 @@ function App() {
   const [datum, setDatum] = useState(new Date().toISOString().slice(0, 10));
   const [kategorie, setKategorie] = useState("");
   const [beleg, setBeleg] = useState(null);
+  const [kannAendern, setKannAendern] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [editDraft, setEditDraft] = useState(null);
+
+  useEffect(() => {
+    // ✏️ nëmmen weisen, wann de Server d'Funktioun scho kennt (ouni neie Server géif et e Feeler ginn).
+    fetch(WEB_APP_URL + "?version=1")
+      .then((r) => r.json())
+      .then((v) => setKannAendern(/Ausgaben änneren/.test(String((v && v.version) || ""))))
+      .catch(() => setKannAendern(false));
+  }, []);
 
   useEffect(() => {
     // Geplangte Käschten aus dem eegene Projektplang-Entworf liesen (nëmmen
@@ -187,6 +198,56 @@ function App() {
       lade();
     } catch (e) {
       setError("Konnte net späicheren: " + e.message);
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
+  const datumFirInput = (d) => {
+    const t = String(d || "");
+    const iso = t.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    const dmy = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+    if (dmy) return dmy[3] + "-" + dmy[2].padStart(2, "0") + "-" + dmy[1].padStart(2, "0");
+    return new Date().toISOString().slice(0, 10);
+  };
+
+  const startEdit = (a) => {
+    setEditId(a.ID);
+    setEditDraft({ bezeechnung: a.Bezeechnung || "", betrag: String(a.Betrag), datum: datumFirInput(a.Datum), kategorie: a.Kategorie || "", beleg: null });
+  };
+
+  const ausgabAendern = async () => {
+    if (!editDraft || !editDraft.bezeechnung.trim() || editDraft.betrag === "" || Number(editDraft.betrag) < 0) return;
+    setSyncing(true);
+    setError(null);
+    try {
+      let belegBase64 = null, belegDateiName = null, belegMimeType = null;
+      if (editDraft.beleg) {
+        belegBase64 = await dateiZuBase64(editDraft.beleg);
+        belegDateiName = editDraft.beleg.name;
+        belegMimeType = editDraft.beleg.type || "application/octet-stream";
+      }
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          typ: "ausgabAendern",
+          token: window.PPREN_SESSION?.token || "",
+          id: editId,
+          bezeechnung: editDraft.bezeechnung, betrag: editDraft.betrag, datum: editDraft.datum, kategorie: editDraft.kategorie,
+          belegBase64, belegDateiName, belegMimeType,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      setToast("Ausgab geännert.");
+      setEditId(null);
+      setEditDraft(null);
+      lade();
+    } catch (e) {
+      setError("Konnte net änneren: " + e.message);
     } finally {
       setSyncing(false);
       setTimeout(() => setToast(null), 3000);
@@ -347,15 +408,28 @@ function App() {
                   {ausgaben.length === 0 && <p className="hint">Nach keng Ausgaben ageginn.</p>}
                   {ausgaben.length > 0 && (
                     <table className="tabelle">
-                      <thead><tr><th>Datum</th><th>Bezeechnung</th><th>Kategorie</th><th>Betrag</th><th>Beleg</th><th></th></tr></thead>
+                      <thead><tr><th>Datum</th><th>Bezeechnung</th><th>Kategorie</th><th>Betrag</th><th>Beleg</th><th></th><th></th></tr></thead>
                       <tbody>
-                        {ausgaben.map((a, i) => (
+                        {ausgaben.map((a, i) => editId === a.ID && editDraft ? (
+                          <tr key={i}>
+                            <td><input type="date" className="input" value={editDraft.datum} onChange={(e) => setEditDraft({ ...editDraft, datum: e.target.value })} /></td>
+                            <td><input className="input" value={editDraft.bezeechnung} onChange={(e) => setEditDraft({ ...editDraft, bezeechnung: e.target.value })} /></td>
+                            <td><input className="input" value={editDraft.kategorie} onChange={(e) => setEditDraft({ ...editDraft, kategorie: e.target.value })} /></td>
+                            <td><input type="number" min="0" step="0.01" className="input" value={editDraft.betrag} onChange={(e) => setEditDraft({ ...editDraft, betrag: e.target.value })} /></td>
+                            <td><input type="file" accept="image/*,.pdf" onChange={(e) => setEditDraft({ ...editDraft, beleg: e.target.files[0] || null })} /></td>
+                            <td colSpan={2}>
+                              <button className="btn btn-primary" disabled={syncing || !editDraft.bezeechnung.trim() || editDraft.betrag === "" || Number(editDraft.betrag) < 0} onClick={ausgabAendern}>{syncing ? "Späichert…" : "💾 Späicheren"}</button>
+                              <button className="btn-gen" onClick={() => { setEditId(null); setEditDraft(null); }}>Ofbriechen</button>
+                            </td>
+                          </tr>
+                        ) : (
                           <tr key={i}>
                             <td>{a.Datum}</td>
                             <td>{a.Bezeechnung}</td>
                             <td className="cell-muted">{a.Kategorie || "–"}</td>
                             <td>{Number(a.Betrag).toFixed(2)} €</td>
                             <td>{a["Beleg-Link"] ? <a href={a["Beleg-Link"]} target="_blank" rel="noreferrer">📎</a> : "–"}</td>
+                            <td>{kannAendern ? <button className="icon-btn icon-btn-edit" title="Ausgab änneren" onClick={() => startEdit(a)}>✏️</button> : null}</td>
                             <td><button className="icon-btn" onClick={() => ausgabLaeschen(a.ID)}>✕</button></td>
                           </tr>
                         ))}
@@ -401,6 +475,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .empty { padding: 30px; text-align: center; color: #6d7d74; font-size: 14px; background: #fff; border-radius: 12px; border: 1px solid #e2e8e3; }
 .btn { font-size: 13.5px; font-weight: 700; padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; }
 .btn-primary { background: #00A94F; color: #fff; }
+.icon-btn-edit { color: #4576B5; }
 .btn-primary:disabled { background: #b7c6bd; cursor: not-allowed; }
 .btn-gen { font-size: 11.5px; font-weight: 700; color: #00A94F; background: #eef3ef; border: 1px solid #c9d5cd; padding: 6px 12px; border-radius: 7px; cursor: pointer; }
 .plang-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
