@@ -10,6 +10,7 @@
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="../ppren-latex/ppren-latex.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -195,6 +196,20 @@ function App() {
   };
 
   useEffect(() => { lade(); }, []);
+
+  // LaTeX-PDFen am Browser (2026-10-28): oppen Optraeg (Docs-PDF → LaTeX-PDF) am Hannergrond ersetzen
+  // (pdfTeX als WebAssembly, ../ppren-latex/). Ouni Ënnerstëtzung am Browser oder Backend: näischt änneren.
+  const [latexStatus, setLatexStatus] = useState(null);
+  const [latexImBrowser, setLatexImBrowser] = useState(false);
+  useEffect(() => {
+    const L = window.PprenLatex;
+    if (!L) return;
+    L.backendKann(WEB_APP_URL).then((kann) => {
+      setLatexImBrowser(kann);
+      if (kann) L.optraegErneieren({ webAppUrl: WEB_APP_URL, token: window.PPREN_SESSION?.token || "", onStatus: setLatexStatus })
+        .catch((e) => console.warn("LaTeX-PDF", e));
+    });
+  }, []);
 
   // max = genehmegten Betrag (€); undefined = Standard-Budget (500 €) bleift.
   const kostenplanGenehmegen = async (schueler, klasse, max) => {
@@ -578,15 +593,18 @@ function App() {
           typ: "plangKiFeedback", token: window.PPREN_SESSION?.token || "",
           schueler: plangCheckModal.schueler, klasse: plangCheckModal.klasse,
           pdf: {
-            fuerProffen, aktivId: plangKiAktivId,
+            fuerProffen, aktivId: plangKiAktivId, browserLatex: latexImBrowser,
             punkte: plangCheckPunkte.map((k) => ({ feld: k.feld, text: k.text, quell: k.quell, aktiv: k.aktiv })),
           },
         }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
-      const bytes = Uint8Array.from(atob(data.pdfBase64), (c) => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      // Mat Browser-LaTeX schéckt de Backend just d'Quell (data.tex), soss déi fäerdeg PDF.
+      const blob = data.tex
+        ? await window.PprenLatex.pdf(data.tex)
+        : new Blob([Uint8Array.from(atob(data.pdfBase64), (c) => c.charCodeAt(0))], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = data.dateiname || "Feedback_Projektplan.pdf";
@@ -668,6 +686,7 @@ function App() {
           <span className="brand-mark">PPREN</span>
           <span className="brand-sub">Lehrer-Dashboard · Sciences Environnementales</span>
         </div>
+        {latexStatus && <span className="brand-sub" title="Projektplang-/Suivi-PDFen ginn am Browser mat LaTeX nei gemaach">🖨 {latexStatus}</span>}
         <button className="refresh-btn" onClick={lade} disabled={loading}>{loading ? "Lädt…" : "🔄 Aktualisieren"}</button>
       </header>
 
