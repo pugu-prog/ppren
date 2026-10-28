@@ -238,6 +238,109 @@
   }
   try { fügGlackBäi(); } catch (e) { /* d'Glack däerf ni d'Säit oder d'Session-Kontroll blockéieren */ }
 
+  // Anonym-Modus 🕶 (NËMMEN Proffen): fir d'Tool virzeweisen (Fortbildung, Beamer),
+  // ouni datt Schülernimm, Matrikelen oder E-Mailen ze gesi sinn. Ersetzt se op ALL
+  // Säiten duerch "Schüler A", "Schüler B" … (nëmmen an der Uschtung, näischt gëtt
+  // geännert oder gespäichert). Un/aus mam Knäppchen ënnen oder Ctrl+Shift+A; de
+  // Zoustand bleift am Browser (localStorage "ppren_anonym") bis en ausgeschalt gëtt.
+  function anonymModus() {
+    if (rolle !== "Prof") return;
+    const API = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
+    const SCHLESSEL = "ppren_anonym";
+    const un = localStorage.getItem(SCHLESSEL) === "1";
+
+    const knapp = document.createElement("button");
+    knapp.textContent = un ? "🕶 Anonym: UN" : "🕶 Anonym";
+    knapp.title = "Schülernimm verstoppen (Ctrl+Shift+A)";
+    knapp.style.cssText = [
+      "position:fixed", "bottom:12px", "left:132px", "z-index:9999",
+      "background:" + (un ? "#c0392b" : "#5a6b63"), "color:#fff", "border:none", "border-radius:20px",
+      "padding:8px 14px", "font-size:11.5px", "font-weight:700",
+      "font-family:-apple-system,'Segoe UI',Inter,Arial,sans-serif",
+      "cursor:pointer", "box-shadow:0 2px 8px rgba(0,0,0,0.25)", "opacity:0.85",
+    ].join(";");
+    const ëmschalten = () => {
+      localStorage.setItem(SCHLESSEL, un ? "0" : "1");
+      window.location.reload();
+    };
+    knapp.onclick = ëmschalten;
+    document.addEventListener("keydown", (ev) => {
+      if (ev.ctrlKey && ev.shiftKey && (ev.key === "A" || ev.key === "a")) { ev.preventDefault(); ëmschalten(); }
+    });
+    const knappBäi = () => { if (document.body && !knapp.isConnected) document.body.appendChild(knapp); };
+    document.addEventListener("DOMContentLoaded", knappBäi);
+    if (document.readyState !== "loading") setTimeout(knappBäi, 0);
+
+    if (!un) return;
+
+    // Bis d'Nimm gelueden sinn: Säit verschwommen, sou datt keen Numm kuerz opblénkt.
+    const stil = document.createElement("style");
+    stil.textContent = "html.ppren-anonym-lued body > *:not(button){filter:blur(10px)!important}";
+    document.documentElement.appendChild(stil);
+    document.documentElement.classList.add("ppren-anonym-lued");
+    const fräi = () => document.documentElement.classList.remove("ppren-anonym-lued");
+    setTimeout(fräi, 8000); // Sécherheet: ni méi wéi 8 s verschwommen
+
+    const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    let reegelen = [];
+    const ersetzen = (text) => {
+      let r = text;
+      for (const [re, ersatz] of reegelen) if (re.test(r)) { re.lastIndex = 0; r = r.replace(re, ersatz); }
+      return r;
+    };
+    const behandelen = (wuerzel) => {
+      if (!reegelen.length || !wuerzel) return;
+      const gänger = document.createTreeWalker(wuerzel, NodeFilter.SHOW_TEXT);
+      const knuet = [];
+      while (gänger.nextNode()) knuet.push(gänger.currentNode);
+      for (const n of knuet) {
+        const nei = ersetzen(n.nodeValue);
+        if (nei !== n.nodeValue) n.nodeValue = nei;
+      }
+      if (wuerzel.querySelectorAll) {
+        // Input-/Textfelder ginn NET ugepaakt: soss kéint e Pseudonym aus Versinn gespäichert ginn.
+        wuerzel.querySelectorAll("[title]").forEach((el) => {
+          const t = el.getAttribute("title");
+          if (t) { const nei = ersetzen(t); if (nei !== t) el.setAttribute("title", nei); }
+        });
+      }
+    };
+
+    fetch(API + "?personenVoll=1&token=" + encodeURIComponent(token))
+      .then((r) => r.json())
+      .then((data) => {
+        const schüler = ((data && data.personen) || []).filter((p) => p.rolle === "Schüler");
+        const BUCHST = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const lis = [];
+        schüler.forEach((p, i) => {
+          const pseudo = "Schüler " + (BUCHST[i % 26] + (i >= 26 ? Math.floor(i / 26) : ""));
+          if (p.numm) lis.push([String(p.numm), pseudo]);
+          if (p.email) lis.push([String(p.email), "•••@•••"]);
+          if (p.virnumm && String(p.virnumm).trim().length >= 2) lis.push([String(p.virnumm).trim(), pseudo]);
+        });
+        lis.sort((a, b) => b[0].length - a[0].length); // laang Wierder fir d'éischt
+        reegelen = lis.map(([w, ersatz]) => [new RegExp("(?<![\\p{L}\\p{N}])" + esc(w) + "(?![\\p{L}\\p{N}])", "gu"), ersatz]);
+        behandelen(document.body);
+        new MutationObserver((ännerungen) => {
+          for (const ä of ännerungen) {
+            if (ä.type === "characterData") {
+              const nei = ersetzen(ä.target.nodeValue);
+              if (nei !== ä.target.nodeValue) ä.target.nodeValue = nei;
+            } else {
+              ä.addedNodes.forEach((n) => {
+                if (n.nodeType === 3) { const nei = ersetzen(n.nodeValue); if (nei !== n.nodeValue) n.nodeValue = nei; }
+                else if (n.nodeType === 1) behandelen(n);
+              });
+              if (ä.type === "attributes" && ä.target) behandelen(ä.target.parentNode || ä.target);
+            }
+          }
+        }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["title"] });
+        fräi();
+      })
+      .catch(fräi);
+  }
+  try { anonymModus(); } catch (e) { /* den Anonym-Modus däerf ni d'Säit blockéieren */ }
+
   // Knäppchen "📅 Terminer" (NËMMEN Proffen): schnelle Zougrëff op d'Iwwersiicht vun de Terminer mat de Schüler.
   function fügTerminerKnappBäi() {
     if (rolle !== "Prof") return;
