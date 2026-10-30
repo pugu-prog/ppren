@@ -126,7 +126,7 @@ function App() {
             <span className="field-label">Matrikel (oder Numm)</span>
             <input
               type="text" className="input" autoCapitalize="none" autoCorrect="off" spellCheck="false"
-              placeholder="z.B. 26-1GSE-01"
+              placeholder="z.B. 26-1GSE-99"
               value={eingabe} onChange={(e) => setEingabe(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && document.getElementById("pin-feld")?.focus()}
             />
