@@ -7,6 +7,7 @@
 <title>PPREN Bewertung</title>
 <script>window.PPREN_ERFUERDERT_ROLLE = "Prof";</script>
 <script src="auth-guard.js"></script>
+<script src="wochenberichte-luecken.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -455,7 +456,7 @@ function App() {
   const [kategorien, setKategorien] = useState([]);
   const [gruppenState, setGruppenState] = useState({});
   const [wbPunkte, setWbPunkte] = useState("");
-  const [wbAuto, setWbAuto] = useState({ summe: 0, max: 0, anzahl: 0 });
+  const [wbAuto, setWbAuto] = useState({ summe: 0, max: 0, anzahl: 0, bewaert: 0, verpasst: 0, feelend: 0 });
   const [fgInfo, setFgInfo] = useState(null);
   const [zpInfo, setZpInfo] = useState(null);
   const [kiPlangInfo, setKiPlangInfo] = useState(null);
@@ -499,7 +500,7 @@ function App() {
     setKategorien(initKategorien(s, p, currentSchueler?.klasse));
     setGruppenState(initGruppenState(s, p));
     setWbPunkte("");
-    setWbAuto({ summe: 0, max: 0, anzahl: 0 });
+    setWbAuto({ summe: 0, max: 0, anzahl: 0, bewaert: 0, verpasst: 0, feelend: 0 });
     setFgInfo(null);
     setZpInfo(null);
     setKiPlangInfo(null);
@@ -528,19 +529,10 @@ function App() {
           if (bestehend.Kommentar) setKommentar(String(bestehend.Kommentar));
         }
       }
-      const meng = (data.wochenberichte || []).filter((w) => w.Schüler === schuelerName && w.Periode === p);
-      let summe = 0, anzahl = 0;
-      meng.forEach((w) => {
-        if (w.Status === "Bewäert") {
-          try {
-            const pk = JSON.parse(w["Punkte (JSON)"]);
-            summe += (pk.zusammenfassung || 0) + (pk.fortschritt || 0) + (pk.anhaenge || 0) + (pk.grammatik || 0);
-            anzahl++;
-          } catch {}
-        }
-      });
-      setWbAuto({ summe, max: anzahl * 5, anzahl });
-      setWbPunkte(String(summe));
+      // Bewäert = Punkten; Verpasst a guer net ofginn = 0 vu 5; Entschëllegt a Vakanzwochen zielen net.
+      const wb = window.PPREN_WB.punkteFirPeriod(schuelerName, p, personen, data.wochenberichte || []);
+      setWbAuto(wb);
+      setWbPunkte(String(wb.summe));
 
       const fgTreffer = (data.fachgespraeche || [])
         .filter((f) => f.Schüler === schuelerName && f.Periode === p)
@@ -990,7 +982,10 @@ function App() {
                 <a className="btn-gen" href="wochenberichte-korrigeieren.html" target="_blank">📋 Wochenberichter korrigéieren →</a>
               </div>
               <div className="kat-row">
-                <span className="kat-name">Punkte (automatesch aus {wbAuto.anzahl} bewäerte Wochenberichter)</span>
+                <span className="kat-name">
+                  Punkte (automatesch aus {wbAuto.anzahl} Wochenberichter: {wbAuto.bewaert} bewäert
+                  {wbAuto.verpasst + wbAuto.feelend > 0 && <>, <strong className="wb-null">{wbAuto.verpasst + wbAuto.feelend} net ofginn = 0 P.</strong></>})
+                </span>
                 <span className="wb-auto-wert">{wbAuto.summe}</span>
                 <span className="kat-max">/ {wbMax}</span>
               </div>
@@ -1122,6 +1117,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .kat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 3px; }
 .card-head-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; flex-wrap: wrap; gap: 8px; }
 .card-head-row h2 { margin: 0; }
+.wb-null { color: #99392f; }
 .wb-auto-wert { flex: 1; text-align: right; font-weight: 700; font-size: 14px; color: #00A94F; }
 .kat-name { flex: 1; font-size: 13px; font-weight: 600; line-height: 1.35; }
 .indikatoren { font-size: 11.5px; color: #6d7d74; line-height: 1.4; padding-right: 100px; }

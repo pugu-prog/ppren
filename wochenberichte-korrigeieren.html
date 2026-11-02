@@ -7,6 +7,7 @@
 <title>PPREN Wochenberichter korrigéieren</title>
 <script>window.PPREN_ERFUERDERT_ROLLE = "Prof";</script>
 <script src="auth-guard.js"></script>
+<script src="wochenberichte-luecken.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -148,6 +149,52 @@ function App() {
       .finally(() => setLoading(false));
   };
   useEffect(() => { lade(); }, []);
+
+  // Ofgeschloss Wochen, fir déi e Schüler guer keen Eintrag huet (och keen
+  // automatesche "Verpasst"). Zielen an der Bewertung als 0 vu 5, ausser se
+  // ginn entschëllegt.
+  const luecken = useMemo(
+    () => (personen.length && !loading ? window.PPREN_WB.luecken(personen, alle) : []),
+    [personen, alle, loading]
+  );
+  const anzahlVerpasst = alle.filter((w) => w.Status === "Verpasst").length;
+
+  const lueckeEintragen = async (l, entschellegt) => {
+    let grond = "";
+    if (entschellegt) {
+      grond = prompt(`Grond fir d'Entschëllegung vun ${ufweis(l.Schüler)} (${l.Woche}), z.B. Krankheet, Attest:`);
+      if (grond === null) return;
+    } else if (!confirm(`${ufweis(l.Schüler)} huet fir d'Woch ${l.Woche} näischt ofginn. Mat 0 Punkte androen (de Schüler gesäit et am Suivi)?`)) {
+      return;
+    }
+    setSyncing(true);
+    try {
+      const post = async (body) => {
+        const res = await fetch(WEB_APP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ token: window.PPREN_SESSION?.token || "", ...body }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+        return data;
+      };
+      const d = await post({
+        typ: "wochenberichtExternEintragen",
+        schueler: l.Schüler, klasse: l.Klasse || "", periode: l.Periode, woche: l.Woche,
+        punkteDetail: { zusammenfassung: 0, fortschritt: 0, anhaenge: 0, grammatik: 0 },
+        notiz: "Net ofginn — vum Prof op 0 Punkte gesat.",
+      });
+      if (entschellegt) await post({ typ: "wochenberichtEntschellegen", id: d.id, grond });
+      setToast(entschellegt ? "Entschëllegt." : "Mat 0 Punkte agedroen.");
+      lade();
+    } catch (e) {
+      alert("Konnte net späicheren: " + e.message);
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
 
   const schuelerListe = useMemo(() => ["alle", ...new Set(alle.map((w) => w.Schüler))], [alle]);
 
@@ -361,13 +408,43 @@ function App() {
           </select>
           <select className="select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
             <option value="Agereecht">Nach ze korrigéieren</option>
-            <option value="Verpasst">Verpasst (automatesch 0)</option>
+            <option value="Verpasst">Verpasst (automatesch 0){anzahlVerpasst ? ` — ${anzahlVerpasst}` : ""}</option>
             <option value="Entschëllegt">Entschëllegt</option>
             <option value="Bewäert">Scho bewäert</option>
             <option value="alle">All</option>
           </select>
           <button className="btn-gen btn-extern" onClick={() => setExternOffen(true)}>➕ Extern bewäert Bericht aginn</button>
         </div>
+
+        {!loading && !error && luecken.length > 0 && (
+          <section className="luecken">
+            <h2>⚠️ {luecken.length} Wochenbericht{luecken.length === 1 ? "" : "er"} feelt — guer keen Eintrag</h2>
+            <p>Fir dës ofgeschloss Wochen (Frist Sonndes 22:00, ouni Vakanzen) huet de Schüler näischt ofginn. In der Bewertung zielen se schonn elo als <strong>0 / 5</strong>, ausser du entschëllegs se.</p>
+            <table className="table">
+              <thead><tr><th>Schüler/-in</th><th>Klasse</th><th>Periode</th><th>Woch</th><th></th></tr></thead>
+              <tbody>
+                {luecken.map((l) => (
+                  <tr key={l.Schüler + l.Woche}>
+                    <td className="cell-strong">{ufweis(l.Schüler)}</td>
+                    <td>{l.Klasse}</td>
+                    <td>{l.Periode}</td>
+                    <td>{l.Woche}</td>
+                    <td className="luecken-aktiounen">
+                      <button className="btn-gen" disabled={syncing} onClick={() => lueckeEintragen(l, false)}>0 Punkte androen</button>
+                      <button className="btn-gen btn-sekundaer" disabled={syncing} onClick={() => lueckeEintragen(l, true)}>Entschëllegen</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+        {!loading && !error && anzahlVerpasst > 0 && filterStatus !== "Verpasst" && filterStatus !== "alle" && (
+          <p className="verpasst-hiweis">
+            Dozou {anzahlVerpasst === 1 ? "ass 1 Bericht" : `sinn ${anzahlVerpasst} Berichter`} automatesch als „Verpasst“ (0 Punkte) markéiert.{" "}
+            <button className="link-btn-klein" onClick={() => setFilterStatus("Verpasst")}>Weisen</button>
+          </p>
+        )}
 
         {loading && <div className="empty">Lädt…</div>}
         {error && <div className="empty error">{error}</div>}
@@ -588,6 +665,13 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .pill { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
 .pill-pending { background: #fbe8c6; color: #8a5a12; }
 .pill-verpasst { background: #fbe4e1; color: #99392f; }
+.luecken { background: #fff4f2; border: 1px solid #f0c4bd; border-radius: 12px; padding: 14px 16px; margin: 0 0 16px; }
+.luecken h2 { font-size: 15px; margin: 0 0 6px; color: #99392f; }
+.luecken p { font-size: 13px; margin: 0 0 10px; color: #5a3a35; }
+.luecken .table { margin: 0; }
+.luecken-aktiounen { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.btn-gen.btn-sekundaer { background: #fff; color: #4a5a51; border: 1px solid #cfd8d2; }
+.verpasst-hiweis { font-size: 13px; color: #99392f; margin: 0 0 12px; }
 .pill-entschellegt { background: #e7eef7; color: #4576B5; }
 .btn-warn { background: #fbe8c6; color: #8a5a12; }
 .btn-open { background: #d7ecdd; color: #00733a; }
