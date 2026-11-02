@@ -6,6 +6,7 @@
 <link rel="icon" type="image/png" href="LogoSE_weisHintergrund.png" />
 <title>PPREN Dokumentatioun</title>
 <script src="auth-guard.js"></script>
+<script src="wochenberichte-luecken.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -92,7 +93,8 @@ function App() {
         const bestehendLink = meins?.["Dokumentatioun-Link"] || "";
         setLink(bestehendLink);
         setGespäichertLink(bestehendLink);
-        setWochenberichte((data.wochenberichte || []).filter((w) => w.Schüler === currentSchueler.name));
+        // Inkl. ofgeschloss Wochen ouni Eintrag ("Net ofginn", zielt als 0 vu 5).
+        setWochenberichte(window.PPREN_WB.mitLuecken([{ numm: currentSchueler.name, rolle: "Schüler", klasse: currentSchueler.klasse }], (data.wochenberichte || []).filter((w) => w.Schüler === currentSchueler.name)));
 
         let gespäichert = [];
         const eintrag = (data.meilensteng || []).find((m) => m.Schüler === currentSchueler.name);

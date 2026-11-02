@@ -112,5 +112,21 @@ window.PPREN_WB = (function () {
     return { summe, max: anzahl * 5, anzahl, bewaert, verpasst, feelend };
   }
 
-  return { ofgeschlossWochen, luecken, punkteFirPeriod, istVakanzLabel, START_ISO };
+  // Zeilen + eng Zeil mam Status "Net ofginn" fir all Lück, fir se iwwerall
+  // (Suivi, Gantt, Planung, Dokumentatioun, Dashboard, ...) gläich ze weisen.
+  // personen: aktiv Persounen oder [{ numm, rolle: "Schüler", klasse }].
+  const NET_OFGINN = "Net ofginn";
+  const NET_OFGINN_TEXT = "Fir dës Woch gouf kee Wochebericht ofginn. Si zielt als 0 vu 5 Punkten, ausser de Bericht gëtt entschëllegt.";
+  function mitLuecken(personen, wochenberichte, jetzt) {
+    return [...(wochenberichte || []), ...luecken(personen, wochenberichte, jetzt).map((l) => ({
+      ...l, ID: "feelt-" + l.Schüler + "-" + l.Woche, Status: NET_OFGINN, Zusammenfassung: NET_OFGINN_TEXT, synthetesch: true,
+    }))];
+  }
+
+  // Zielt als 0 vu 5: Verpasst (ausser an enger Vakanzwoch) oder guer net ofginn.
+  function zieltAlsNull(w) {
+    return w.Status === NET_OFGINN || (w.Status === "Verpasst" && !istVakanzLabel(w.Woche));
+  }
+
+  return { ofgeschlossWochen, luecken, mitLuecken, zieltAlsNull, punkteFirPeriod, istVakanzLabel, NET_OFGINN, NET_OFGINN_TEXT, START_ISO };
 })();

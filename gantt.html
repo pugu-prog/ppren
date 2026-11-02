@@ -6,6 +6,7 @@
 <link rel="icon" type="image/png" href="LogoSE_weisHintergrund.png" />
 <title>PPREN Gantt-Chart</title>
 <script src="auth-guard.js"></script>
+<script src="wochenberichte-luecken.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -31,7 +32,7 @@ const KATEGORIE_OPTIONEN = ["Event", "Iwwerpréiwung", "Praktesch Phase", "Ofgab
 const KATEGORIE_FARWEN = { "Event": "#f0ec3a", "Iwwerpréiwung": "#d9d3f5", "Praktesch Phase": "#1ecdc4", "Ofgab": "#a9d92d", "Eegen": "#F67E1B", "Projektplang": "#5b9bd5", "Vakanz": "#b3d9e8" };
 const KATEGORIE_TEXT = { "Event": "#1c2621", "Iwwerpréiwung": "#1c2621", "Praktesch Phase": "#04342c", "Ofgab": "#1c2621", "Eegen": "#ffffff", "Projektplang": "#ffffff", "Vakanz": "#1c4a5e" };
 const STATUS_RAND = { "Ausstoend": "transparent", "Erreecht": "#00A94F", "Verspéit": "#e8483a" };
-const WB_FARWEN = { "Bewäert": "#00A94F", "Agereecht": "#4576B5", "Verpasst": "#e8483a", "Entschëllegt": "#93a098" };
+const WB_FARWEN = { "Bewäert": "#00A94F", "Agereecht": "#4576B5", "Verpasst": "#e8483a", "Net ofginn": "#e8483a", "Entschëllegt": "#93a098" };
 
 // Lëtzebuerger Schoulvakanzen a Feierdeeg fir d'Schouljoer 2026/2027 (Quell: men.public.lu)
 const VAKANZEN_2026_27 = [
@@ -130,7 +131,8 @@ function App() {
           .filter((m) => (m.quell || "Eegen") === "Eegen")
           .filter((m) => !offiziellSchlëssel.has(m.datum + "|" + m.titel));
         setMeilensteng([...offiziell, ...projektplang, ...eegen, ...VAKANZ_ZEILEN]);
-        setWochenberichte((data.wochenberichte || []).filter((w) => w.Schüler === s.name));
+        // Inkl. ofgeschloss Wochen ouni Eintrag ("Net ofginn", zielt als 0 vu 5).
+        setWochenberichte(window.PPREN_WB.mitLuecken([{ numm: s.name, rolle: "Schüler", klasse: s.klasse }], (data.wochenberichte || []).filter((w) => w.Schüler === s.name)));
       })
       .catch(() => setError("Konnte Meilensteng net lueden."))
       .finally(() => setLoading(false));
@@ -195,7 +197,7 @@ function App() {
               <span className="legend-item"><span className="legend-dot legend-dot-verspéit" />Verspéit</span>
               <span className="legend-item"><span className="legend-punkt" style={{ background: WB_FARWEN.Bewäert }} />Wochebericht bewäert</span>
               <span className="legend-item"><span className="legend-punkt" style={{ background: WB_FARWEN.Agereecht }} />Wochebericht agereecht</span>
-              <span className="legend-item"><span className="legend-punkt" style={{ background: WB_FARWEN.Verpasst }} />Wochebericht verpasst</span>
+              <span className="legend-item"><span className="legend-punkt" style={{ background: WB_FARWEN.Verpasst }} />Wochebericht verpasst / net ofginn</span>
             </div>
 
             {sortéiert.length === 0 && wbPunkten.length === 0 ? (

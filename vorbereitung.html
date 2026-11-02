@@ -7,6 +7,7 @@
 <title>PPREN Gespräche vorbereiten</title>
 <script>window.PPREN_ERFUERDERT_ROLLE = "Prof";</script>
 <script src="auth-guard.js"></script>
+<script src="wochenberichte-luecken.js"></script>
 <style>
 * { box-sizing: border-box; }
 body { margin: 0; font-family: -apple-system, 'Segoe UI', Inter, Arial, sans-serif; background: #f3f6f4; color: #1f2a24; font-size: 14px; }
@@ -206,12 +207,15 @@ function baueDossier(daten, id, heut) {
   }
 
   // Wochenberichter: genau Analys
-  const vorhanden = new Set(wb.map((x) => x.start));
-  const fehlend = [];
-  for (let m = "2026-09-21"; isoPlus(m, 6) < heut; m = isoPlus(m, 7)) {
-    if (!vorhanden.has(m)) fehlend.push(kurzDatum(m) + "–" + kurzDatum(isoPlus(m, 6)));
-  }
-  if (fehlend.length) add(2, "Wochenbericht fehlt: " + fehlend.join(", "), true);
+  // Feelend = guer keen Eintrag oder "Verpasst" (net entschëllegt, keng Vakanzwoch) — zielt als 0/5 (wochenberichte-luecken.js).
+  const person = (daten.personen || []).find((p) => p.numm === id);
+  const fehlend = window.PPREN_WB.mitLuecken([{ numm: id, rolle: "Schüler", klasse: person ? person.klasse : "" }], wbAlles)
+    .filter((w) => window.PPREN_WB.zieltAlsNull(w))
+    .map((w) => dmyZuIso(String(w.Woche || "").split("–")[0].trim()))
+    .filter(Boolean)
+    .sort()
+    .map((m) => kurzDatum(m) + "–" + kurzDatum(isoPlus(m, 6)));
+  if (fehlend.length) add(2, "Wochenbericht fehlt (zählt 0/5): " + fehlend.join(", "), true);
   const spaet = wb.filter((x) => {
     const v = new Date(x.w["Datum Verfassung"]);
     return !isNaN(v) && x.start && v > new Date(isoPlus(x.start, 6) + "T22:00:00");

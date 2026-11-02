@@ -7,6 +7,7 @@
 <title>PPREN Wochenbericht</title>
 <script>window.PPREN_ERFUERDERT_ROLLE = "Schüler";</script>
 <script src="auth-guard.js"></script>
+<script src="wochenberichte-luecken.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -249,6 +250,12 @@ function App() {
     ? meng.find((w) => w.Periode === periode && w.Woche === bericht.woche && w.ID !== bericht.id)
     : null;
   const wocheBewaert = !!bestehendFuerWoche && bestehendFuerWoche.Status === "Bewäert";
+  // Nëmme fir d'Lëscht: ofgeschloss Wochen ouni Eintrag als "Net ofginn" (0 vu 5) weisen.
+  const mengMatLuecken = useMemo(
+    () => (currentSchueler ? window.PPREN_WB.mitLuecken([{ numm: currentSchueler.name, rolle: "Schüler", klasse: currentSchueler.klasse }], meng) : meng),
+    [meng, currentSchueler]
+  );
+
   const wocheGespaart = !!bestehendFuerWoche && (wocheBewaert || (bestehendFuerWoche.Status !== "Verpasst" && fristZu(bericht.woche)));
 
   const canSubmit = periode && bericht.zusammenfassung.trim() && bericht.fortschritt.trim() && !wocheGespaart && !previewOnlyVirStart;
@@ -527,13 +534,13 @@ function App() {
               <h2>Meng Berichter — {periode}</h2>
               <p className="hint-klengt">🔒 Nom Ofgabetermin (Sonndes 22:00) kann e Bericht net méi geännert ginn.</p>
               {loading && <p className="notice">Lädt…</p>}
-              {!loading && meng.filter((w) => w.Periode === periode).length === 0 && (
+              {!loading && mengMatLuecken.filter((w) => w.Periode === periode).length === 0 && (
                 <p className="notice">Nach kee Bericht fir dës Period ofginn.</p>
               )}
               <table className="tabelle">
                 <thead><tr><th>Woch</th><th>Meilensteen</th><th>Status</th><th>Punkte</th><th></th></tr></thead>
                 <tbody>
-                  {meng.filter((w) => w.Periode === periode).map((w) => {
+                  {mengMatLuecken.filter((w) => w.Periode === periode).map((w) => {
                     let summe = null;
                     if (w.Status === "Bewäert") {
                       try {
@@ -546,9 +553,9 @@ function App() {
                         <tr>
                           <td>{w.Woche}</td>
                           <td className="cell-muted">{w.Meilensteen || "–"}</td>
-                          <td><span className={`pill ${w.Status === "Bewäert" ? "pill-done" : "pill-pending"}`}>{w.Status}</span></td>
-                          <td>{summe !== null ? `${summe} / 5` : "–"}</td>
-                          <td>{w.Status !== "Bewäert" && (fristZu(w.Woche)
+                          <td><span className={`pill ${w.Status === "Bewäert" ? "pill-done" : window.PPREN_WB.zieltAlsNull(w) ? "pill-feelt" : "pill-pending"}`}>{w.Status}</span></td>
+                          <td>{summe !== null ? `${summe} / 5` : window.PPREN_WB.zieltAlsNull(w) ? "0 / 5" : "–"}</td>
+                          <td>{w.Status !== "Bewäert" && !w.synthetesch && (fristZu(w.Woche)
                             ? <span className="cell-muted" title="Frist eriwwer — net méi ännerbar">🔒</span>
                             : <button className="btn-gen" onClick={() => bearbechten(w)}>Änneren</button>)}</td>
                         </tr>
@@ -642,6 +649,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
 .pill-pending { background: #e6e9e6; color: #55625a; }
 .pill-done { background: #d7ecdd; color: #00A94F; }
+.pill-feelt { background: #fbe4e1; color: #99392f; }
 .error { color: #8a2b1f; padding: 12px; }
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1c2621; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; }
 </style>

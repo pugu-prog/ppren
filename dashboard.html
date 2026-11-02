@@ -7,6 +7,7 @@
 <title>PPREN Lehrer-Dashboard</title>
 <script>window.PPREN_ERFUERDERT_ROLLE = "Prof";</script>
 <script src="auth-guard.js"></script>
+<script src="wochenberichte-luecken.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -672,6 +673,13 @@ function App() {
     return true;
   });
 
+  // Wochenberichter inkl. ofgeschloss Wochen ouni Eintrag ("Net ofginn", zielt als 0 vu 5).
+  const wbMatLuecken = useMemo(
+    () => (personen.length ? window.PPREN_WB.mitLuecken(personen, wochenberichte) : wochenberichte),
+    [personen, wochenberichte]
+  );
+  const wbNull = wbMatLuecken.filter((w) => window.PPREN_WB.zieltAlsNull(w)).length;
+
   const zaehler = {
     total: projekte.length,
     done: projekte.filter((p) => statusMeta(p.Status).key === "done").length,
@@ -722,6 +730,10 @@ function App() {
           <span className="stat-num">{wochenberichte.filter((w) => w.Status === "Agereecht").length}</span>
           <span className="stat-label">Wochenberichter ze korrigéieren</span>
         </div>
+        <a className="stat-card stat-feelt" href="wochenberichte-korrigeieren.html">
+          <span className="stat-num">{wbNull}</span>
+          <span className="stat-label">Wochenberichter net ofginn (0 P.)</span>
+        </a>
       </div>
 
       <div className="controls">
@@ -963,8 +975,8 @@ function App() {
         <div className="wb-link-row">
           <a className="link-btn" href="wochenberichte-korrigeieren.html">📋 Alleguer korrigéieren →</a>
         </div>
-        {!loading && !error && wochenberichte.length === 0 && <div className="empty">Nach keng Wochenberichter ofginn.</div>}
-        {!loading && !error && wochenberichte.length > 0 && (
+        {!loading && !error && wbMatLuecken.length === 0 && <div className="empty">Nach keng Wochenberichter ofginn.</div>}
+        {!loading && !error && wbMatLuecken.length > 0 && (
           <table className="table">
             <thead>
               <tr>
@@ -972,9 +984,12 @@ function App() {
               </tr>
             </thead>
             <tbody>
-              {wochenberichte
+              {wbMatLuecken
                 .slice()
-                .sort((a, b) => (a.Status === "Agereecht" ? -1 : 1) - (b.Status === "Agereecht" ? -1 : 1))
+                .sort((a, b) => {
+                  const rang = (w) => (w.Status === "Agereecht" ? 0 : window.PPREN_WB.zieltAlsNull(w) ? 1 : 2);
+                  return rang(a) - rang(b);
+                })
                 .slice(0, 15)
                 .map((w, i) => (
                   <tr key={i}>
@@ -982,7 +997,7 @@ function App() {
                     <td>{w.Klasse}</td>
                     <td>{w.Periode}</td>
                     <td>{w.Woche}</td>
-                    <td><span className={`pill pill-${w.Status === "Bewäert" ? "done" : "pending"}`}>{w.Status}</span></td>
+                    <td><span className={`pill pill-${w.Status === "Bewäert" ? "done" : window.PPREN_WB.zieltAlsNull(w) ? "feelt" : "pending"}`}>{w.Status}</span></td>
                   </tr>
                 ))}
             </tbody>
@@ -1268,6 +1283,9 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Inter, Arial, sans-ser
 .pill-draft { background: #e6e9e6; color: #55625a; }
 .pill-pending { background: #fbe8c6; color: #8a5a12; }
 .pill-done { background: #d7ecdd; color: #00A94F; }
+.pill-feelt { background: #fbe4e1; color: #99392f; }
+.stat-feelt { text-decoration: none; color: inherit; }
+.stat-feelt .stat-num { color: #99392f; }
 .section-titel { font-size: 15px; font-weight: 800; color: #00A94F; padding: 8px 22px 0; margin: 0; }
 .wb-link-row { padding: 10px 0; }
 .link-btn { display: inline-block; font-size: 12.5px; font-weight: 700; color: #00A94F; background: #eef3ef; border: 1px solid #c9d5cd; padding: 7px 14px; border-radius: 8px; text-decoration: none; }

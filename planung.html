@@ -6,6 +6,7 @@
 <link rel="icon" type="image/png" href="LogoSE_weisHintergrund.png" />
 <title>PPREN Planungstool</title>
 <script src="auth-guard.js"></script>
+<script src="wochenberichte-luecken.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -163,7 +164,8 @@ function App() {
         // Datum/Titel ginn do festgeluecht — hei Status/Notiz/Beschreiwung upassbar.
         setProjektplang(gespäichert.filter((m) => m.quell === "Projektplang").map((m) => ({ ...m, beschreiwung: m.beschreiwung || "" })));
         setOffiziell(offiziellFuerKlass);
-        setWochenberichte((data.wochenberichte || []).filter((w) => w.Schüler === s.name));
+        // Inkl. ofgeschloss Wochen ouni Eintrag ("Net ofginn", zielt als 0 vu 5).
+        setWochenberichte(window.PPREN_WB.mitLuecken([{ numm: s.name, rolle: "Schüler", klasse: s.klasse }], (data.wochenberichte || []).filter((w) => w.Schüler === s.name)));
       })
       .catch((e) => setError("Konnte Meilensteng net lueden" + (e.message ? ": " + e.message : "") + " — Späicheren ass gespaart, bis d'Lueden erëm klappt (Säit nei lueden probéieren)."))
       .finally(() => setLoading(false));

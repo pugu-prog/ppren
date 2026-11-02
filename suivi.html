@@ -6,6 +6,7 @@
 <link rel="icon" type="image/png" href="LogoSE_weisHintergrund.png" />
 <title>PPREN Mäin Suivi</title>
 <script src="auth-guard.js"></script>
+<script src="wochenberichte-luecken.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -430,9 +431,17 @@ function App() {
   const entworfFuer = (periode) => bewertungen.find((b) => b.Periode === periode && b.Status !== "Finalisiert");
   const planDetails = projekt ? sicherJson(projekt["Projektplan-Details (JSON)"], null) : null;
 
+  // Ofgeschloss Wochen ouni iergendeen Eintrag (och nach keen automatesche
+  // "Verpasst") als "Net ofginn" derbäisetzen: si zielen als 0 vu 5, ausser
+  // de Prof entschëllegt se (selwecht Regel wéi an der Bewertung).
+  const wbAnzeigen = useMemo(() => {
+    if (!currentSchueler || !window.PPREN_WB) return wochenberichte;
+    return window.PPREN_WB.mitLuecken([{ numm: currentSchueler.name, rolle: "Schüler", klasse: currentSchueler.klasse }], wochenberichte);
+  }, [wochenberichte, currentSchueler]);
+
   // ===== Projet-Journal: alles chronologesch zesummesetzen =====
   const journal = useMemo(() => {
-    if (meilensteng.length === 0 && wochenberichte.length === 0) return null;
+    if (meilensteng.length === 0 && wbAnzeigen.length === 0) return null;
 
     const findNootstMeilensteen = (isoDatum) => {
       if (!isoDatum || meilensteng.length === 0) return null;
@@ -445,7 +454,7 @@ function App() {
     };
 
     const wbNoMeilensteen = {};
-    wochenberichte.forEach((w) => {
+    wbAnzeigen.forEach((w) => {
       const wocheDatum = ersteDatumVunWoche(w.Woche);
       const bezug = w.Meilensteen && w.Meilensteen.trim() ? w.Meilensteen.trim() : findNootstMeilensteen(wocheDatum);
       const schlëssel = bezug || "__ouni__";
@@ -463,7 +472,7 @@ function App() {
       .sort((a, b) => String(a.datum).localeCompare(String(b.datum)));
 
     return { zeitleischt, wbNoMeilensteen };
-  }, [meilensteng, wochenberichte, fachgespraeche, zieluewerpreiwungen]);
+  }, [meilensteng, wbAnzeigen, fachgespraeche, zieluewerpreiwungen]);
 
   // ===== Gesamt-Iwwerbléck: nächst Ofgab, nächst Rendez-vous, Gesamt-Fortschrëtt =====
   const iwwerbleck = useMemo(() => {
@@ -488,7 +497,7 @@ function App() {
   // ===== Wochenberichter-Punkte-Zesummefaassung =====
   const wbZesummefaassung = useMemo(() => {
     let summe = 0, max = 0, verpasst = 0;
-    wochenberichte.forEach((w) => {
+    wbAnzeigen.forEach((w) => {
       if (w.Status === "Entschëllegt") return;
       if (w.Status === "Bewäert") {
         try {
@@ -496,13 +505,13 @@ function App() {
           summe += (p.zusammenfassung || 0) + (p.fortschritt || 0) + (p.anhaenge || 0) + (p.grammatik || 0);
         } catch {}
         max += 5;
-      } else if (w.Status === "Verpasst") {
+      } else if (window.PPREN_WB ? window.PPREN_WB.zieltAlsNull(w) : w.Status === "Verpasst") {
         verpasst++;
         max += 5;
       }
     });
     return { summe, max, verpasst };
-  }, [wochenberichte]);
+  }, [wbAnzeigen]);
 
   const drécken = () => {
     document.body.classList.add("print-journal");
@@ -677,24 +686,24 @@ function App() {
             <section className="card">
               <span className="kapitel-label">Wochenberichter</span>
               <h2 className="periode-h2">📋 Iwwersiicht</h2>
-              {wochenberichte.length === 0 ? (
+              {wbAnzeigen.length === 0 ? (
                 <p className="notice">Nach keng Wochenberichter ofginn.</p>
               ) : (
                 <>
-                  <p className="punkte-summe">Gesamt: {wbZesummefaassung.summe} / {wbZesummefaassung.max} Punkte{wbZesummefaassung.verpasst > 0 ? ` · ${wbZesummefaassung.verpasst} verpasst` : ""}</p>
+                  <p className="punkte-summe">Gesamt: {wbZesummefaassung.summe} / {wbZesummefaassung.max} Punkte{wbZesummefaassung.verpasst > 0 ? ` · ${wbZesummefaassung.verpasst} net ofginn (0 Punkten)` : ""}</p>
                   <table className="wb-tabelle">
                     <thead>
                       <tr><th>Woch</th><th>Status</th><th>Punkte</th><th></th></tr>
                     </thead>
                     <tbody>
-                      {[...wochenberichte].sort((a, b) => (ersteDatumVunWoche(a.Woche) || "").localeCompare(ersteDatumVunWoche(b.Woche) || "")).map((w, i) => {
+                      {[...wbAnzeigen].sort((a, b) => (ersteDatumVunWoche(a.Woche) || "").localeCompare(ersteDatumVunWoche(b.Woche) || "")).map((w, i) => {
                         let punkteAnzeigen = "–";
                         if (w.Status === "Bewäert") {
                           try {
                             const p = JSON.parse(w["Punkte (JSON)"]);
                             punkteAnzeigen = `${(p.zusammenfassung || 0) + (p.fortschritt || 0) + (p.anhaenge || 0) + (p.grammatik || 0)} / 5`;
                           } catch { punkteAnzeigen = "–"; }
-                        } else if (w.Status === "Verpasst") {
+                        } else if (w.Status === "Verpasst" || w.Status === "Net ofginn") {
                           punkteAnzeigen = "0 / 5";
                         }
                         const wbKey = w.ID || i;
@@ -709,7 +718,7 @@ function App() {
                             <tr>
                               <td>{w.Woche}</td>
                               <td>
-                                <span className={`journal-status journal-status-${{ "Bewäert": "erreecht", "Verpasst": "verspéit", "Agereecht": "neutral", "Entschëllegt": "ausstoend" }[w.Status] || "neutral"}`}>{w.Status}</span>
+                                <span className={`journal-status journal-status-${{ "Bewäert": "erreecht", "Verpasst": "verspéit", "Net ofginn": "verspéit", "Agereecht": "neutral", "Entschëllegt": "ausstoend" }[w.Status] || "neutral"}`}>{w.Status}</span>
                                 {w.Kommentar ? <span title="Kommentar vum Betreier"> 💬</span> : null}
                               </td>
                               <td>{punkteAnzeigen}</td>
