@@ -175,6 +175,7 @@ function App() {
   const [periode, setPeriode] = useState("");
   const [bericht, setBericht] = useState(leererBericht());
   const [aneWocheGewielt, setAneWocheGewielt] = useState(false);
+  const [ferienOK, setFerienOK] = useState(""); // Woch-Label, fir déi de Schüler an de Vakanzen fräiwëlleg schreift
   const [dateien, setDateien] = useState([]);
   const [meng, setMeng] = useState([]);
   const [meilensteng, setMeilensteng] = useState([]); // fir d'Optional-Verlinkung
@@ -255,6 +256,10 @@ function App() {
     () => (currentSchueler ? window.PPREN_WB.mitLuecken([{ numm: currentSchueler.name, rolle: "Schüler", klasse: currentSchueler.klasse }], meng) : meng),
     [meng, currentSchueler]
   );
+
+  // Vakanzwoch: kee Bericht néideg. Formulaire nëmme fir Schüler verstoppt, bis si bewosst "trotzdem" wielen
+  // (fräiwëlleg, Bewäertung nëmmen op Wonsch). Bestehend Berichter (bericht.id) bleiwen änneren.
+  const ferienHinweis = istSchueler && !bericht.id && window.PPREN_WB.istVakanzLabel(bericht.woche) && ferienOK !== bericht.woche;
 
   const wocheGespaart = !!bestehendFuerWoche && (wocheBewaert || (bestehendFuerWoche.Status !== "Verpasst" && fristZu(bericht.woche)));
 
@@ -480,6 +485,16 @@ function App() {
                 )
               )}
 
+              {ferienHinweis && (
+                <p className="notice">
+                  🏖️ Dës Woch ({bericht.woche}) ass <strong>Vakanz</strong> — du muss kee Wochebericht schreiwen.
+                  Wëlls du awer fräiwëlleg ee schreiwen (bewäert gëtt en nëmmen op däi Wonsch), da kléck hei:{" "}
+                  <button type="button" className="link-btn-klein" style={{ display: "inline", margin: 0 }} onClick={() => setFerienOK(bericht.woche)}>Ech wëll trotzdem ofginn</button>.
+                  Fir eng Schoulwoch virun de Vakanzen: uewen d'Woch auswielen.
+                </p>
+              )}
+
+              <div style={ferienHinweis ? { display: "none" } : undefined}>
               {meilensteng.length > 0 && (
                 <label className="field">
                   <span className="field-label">Bezitt sech op Meilensteen <em>(optional — automatesch virgeschloen no Datum)</em></span>
@@ -528,6 +543,7 @@ function App() {
               <button className="btn btn-primary" disabled={!canSubmit || syncing} onClick={absenden}>
                 {syncing ? "Sendet…" : previewOnlyVirStart ? "🔒 Ofginn gespaart bis 21.09.2026" : bericht.id ? "💾 Ännerung späicheren" : "📤 Ofginn"}
               </button>
+              </div>
             </section>
 
             <section className="card">
