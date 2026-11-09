@@ -257,7 +257,7 @@ function App() {
     [meng, currentSchueler]
   );
 
-  // Vakanzwoch: kee Bericht néideg. Formulaire nëmme fir Schüler verstoppt, bis si bewosst "trotzdem" wielen
+  // Vakanzwoch: kee Bericht néideg. Formulaire nëmme fir Schüler verstoppt, bis si bewosst "trotzdeem" wielen
   // (fräiwëlleg, Bewäertung nëmmen op Wonsch). Bestehend Berichter (bericht.id) bleiwen änneren.
   const ferienHinweis = istSchueler && !bericht.id && window.PPREN_WB.istVakanzLabel(bericht.woche) && ferienOK !== bericht.woche;
 
@@ -489,7 +489,7 @@ function App() {
                 <p className="notice">
                   🏖️ Dës Woch ({bericht.woche}) ass <strong>Vakanz</strong> — du muss kee Wochebericht schreiwen.
                   Wëlls du awer fräiwëlleg ee schreiwen (bewäert gëtt en nëmmen op däi Wonsch), da kléck hei:{" "}
-                  <button type="button" className="link-btn-klein" style={{ display: "inline", margin: 0 }} onClick={() => setFerienOK(bericht.woche)}>Ech wëll trotzdem ofginn</button>.
+                  <button type="button" className="link-btn-klein" style={{ display: "inline", margin: 0 }} onClick={() => setFerienOK(bericht.woche)}>Ech wëll trotzdeem ofginn</button>.
                   Fir eng Schoulwoch virun de Vakanzen: uewen d'Woch auswielen.
                 </p>
               )}
