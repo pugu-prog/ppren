@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" type="image/png" href="LogoSE_weisHintergrund.png" />
+<title>PPREN Aufgaben bis Juni</title>
+<script>window.PPREN_ERFUERDERT_ROLLE = "Prof";</script>
+<script src="auth-guard.js"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+:root{--bg:#f6f7f4;--fg:#1d2a22;--mut:#66736b;--card:#fff;--line:#d8dfd9;--gr:#2e7d4f;--bl:#2b6cb0;--or:#c2701a;--rd:#b3382c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 -apple-system,system-ui,sans-serif}
+.wrap{max-width:1000px;margin:auto;padding:14px 16px 40px}
+h1{font-size:20px;margin:0}h3{margin:14px 0 6px;font-size:15px}
+.sub{color:var(--mut);font-size:13px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.tab{border:1px solid var(--line);background:var(--card);color:var(--fg);padding:7px 12px;border-radius:8px 8px 0 0;cursor:pointer;font:inherit;font-size:13px}
+.tab.on{background:var(--gr);color:#fff;border-color:var(--gr)}.tab .p{opacity:.75;margin-left:6px;font-size:12px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:0 8px 8px 8px;padding:16px}
+.bar{height:10px;background:var(--line);border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:var(--gr)}
+.prog{font-size:13px;color:var(--mut);margin:4px 0 8px}
+h2{font-size:15px;margin:18px 0 6px;display:flex;justify-content:space-between;gap:8px}h2 small{font-weight:400;color:var(--mut);font-size:12px}
+.t{border-top:1px solid var(--line);padding:8px 0 8px 8px;border-left:3px solid transparent}
+.t.e-bleibt{border-left-color:var(--gr)}.t.e-aendern{border-left-color:var(--or)}.t.e-raus{border-left-color:var(--rd)}
+.t.e-raus .txt{text-decoration:line-through;color:var(--mut)}.t.e-aendern .txt{color:var(--mut);font-size:13px}
+.row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}.tx{flex:1;min-width:220px}
+.zf{font-size:12px;color:var(--mut);margin-left:6px;font-style:italic}
+.h{font-size:11px;padding:1px 6px;border-radius:9px;margin-left:6px;border:1px solid}.h.Plan{color:var(--bl)}.h.Virschlag{color:var(--or)}
+.eg{display:flex;gap:4px}
+.eb{font:inherit;font-size:12px;padding:4px 9px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:14px;cursor:pointer}
+.eb.bleibt.on{background:var(--gr);border-color:var(--gr);color:#fff}.eb.aendern.on{background:var(--or);border-color:var(--or);color:#fff}.eb.raus.on{background:var(--rd);border-color:var(--rd);color:#fff}
+.det{display:flex;gap:8px;margin:6px 0 0;flex-wrap:wrap;align-items:center}
+.det input,.det select,.det textarea{font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+.det input.no{flex:1;min-width:150px}textarea.neu{width:100%;border-color:var(--or)}
+.amp{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;background:var(--line)}
+.amp.ok{background:var(--gr)}.amp.geliefert{background:var(--bl)}.amp.faellig{background:var(--or)}.amp.ueberfaellig{background:var(--rd)}
+.vs{font-size:10px;color:var(--bl);border:1px dashed var(--bl);border-radius:8px;padding:0 5px;margin-left:6px;white-space:nowrap}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 4px;align-items:center}
+.b{font:inherit;font-size:13px;padding:6px 12px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:8px;cursor:pointer}.b:hover{border-color:var(--gr)}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left}td.n,th.n{text-align:right}
+.hint{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px}
+.state{font-size:12px;color:var(--mut)}.state.err{color:var(--rd)}
+.mock{background:#fff3cd;border:1px solid #e0c36a;padding:6px 12px;border-radius:8px;font-size:13px;margin-bottom:10px}
+@media print{.tools,.tabs,.noprint{display:none!important}.panel{border:0;padding:0}body{background:#fff}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  window.addEventListener("error", function (e) {
+    document.getElementById("root").innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#8a2b1f;white-space:pre-wrap;"><h2 style="margin-top:0;">Fehler beim Laden</h2>' + (e.message || "Unbekannter Fehler") + "</div>";
+  });
+</script>
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef } = React;
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
+// ?mock=1 → keng Netzwierk-Ufroen (nëmme Fantasie-Daten am Späicher), fir lokalen Test virum Backend-Deploy
+const MOCK = new URLSearchParams(location.search).get("mock") === "1";
+
+const STATUS = [["offen", "offen"], ["geliefert", "geliefert"], ["geprueft", "geprüft"], ["nachbesserung", "Nachbesserung"]];
+const ENT = [["bleibt", "Bleift"], ["aendern", "Änneren"], ["raus", "Raus"]];
+const MN = ["Januar", "Februar", "Mäerz", "Abrëll", "Mee", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+const AMP_T = { ok: "geprüft", geliefert: "geliefert", faellig: "fälleg", ueberfaellig: "iwwerfälleg", spaeter: "nach net fälleg" };
+
+/* ---------- Modell ---------- */
+const view = (a) => ({ ent: a.entscheidung || "offen", neu: a.neuerText || "", status: a.status || "offen", datum: a.datum || "", notiz: a.notiz || "" });
+const txt = (a) => { const v = view(a); return v.ent === "aendern" && v.neu ? v.neu : a.text; };
+const MON = { nov: 10, dez: 11, dec: 11, jan: 0, feb: 1, "mäerz": 2, march: 2, mar: 2, abr: 3, apr: 3, mee: 4, may: 4, juni: 5, june: 5, jun: 5 };
+const jahr = (m) => (m >= 7 ? 2026 : 2027);
+function fenster(a, ph) {
+  const z = (a.zeitfenster || "").toLowerCase();
+  const toks = z.match(/nov|dez|dec|jan|feb|mäerz|march|mar|abr|apr|mee|may|juni|june|jun/g);
+  if (toks && toks.length) {
+    const s = MON[toks[0]], e = MON[toks[toks.length - 1]];
+    let start = new Date(jahr(s), s, 1);
+    const end = /mëtt|mid/.test(z) ? new Date(jahr(e), e, 15) : new Date(jahr(e), e + 1, 0);
+    if (/^\s*(bis|until|by)/.test(z) && toks.length === 1) start = null;
+    return { start, end };
+  }
+  if (/lafend|ongoing/.test(z)) return { lafend: true };
+  if (ph && /16\.11|16 nov/i.test(ph.titel)) return { start: null, end: new Date(2026, 10, 16) };
+  return null;
+}
+function ampel(a, ph) {
+  const v = view(a);
+  if (v.ent === "raus") return null;
+  if (v.status === "geprueft") return "ok";
+  if (v.status === "geliefert") return "geliefert";
+  const f = fenster(a, ph);
+  if (!f || f.lafend) return null;
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  if (f.end && t > f.end) return "ueberfaellig";
+  if ((!f.start || t >= f.start) && f.end && t <= f.end) return "faellig";
+  return "spaeter";
+}
+const phOf = (d, a) => (d.phasen || []).find((p) => p.id === a.phase);
+function zaehl(d) {
+  if (!d) return null;
+  const c = { n: 0, bleibt: 0, aendern: 0, raus: 0, offen: 0, geliefert: 0, geprueft: 0, nachb: 0, ueber: 0, faellig: 0 };
+  d.aufgaben.forEach((a) => {
+    const v = view(a); c[v.ent]++;
+    if (v.ent === "raus") return;
+    c.n++;
+    if (v.status === "geliefert") c.geliefert++;
+    if (v.status === "geprueft") c.geprueft++;
+    if (v.status === "nachbesserung") c.nachb++;
+    const am = ampel(a, phOf(d, a));
+    if (am === "ueberfaellig") c.ueber++;
+    if (am === "faellig") c.faellig++;
+  });
+  c.p = c.n ? Math.round((100 * c.geprueft) / c.n) : 0;
+  return c;
+}
+const heute = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: type || "text/plain" }));
+  a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function schuelerText(id, d) {
+  const o = ["# Deng Aufgaben bis Enn Juni – " + id, ""];
+  (d.phasen || []).forEach((ph) => {
+    const l = d.aufgaben.filter((a) => a.phase === ph.id && ["bleibt", "aendern"].includes(view(a).ent));
+    if (!l.length) return;
+    o.push("## " + ph.titel, "");
+    l.forEach((a) => o.push("- [ ] " + txt(a) + (a.zeitfenster ? " _(" + a.zeitfenster + ")_" : "")));
+    o.push("");
+  });
+  const off = d.aufgaben.filter((a) => view(a).ent === "offen").length;
+  if (off) o.push("<!-- NOCH OFFEN: " + off + " Punkte ohne Entscheedung -->");
+  return o.join("\n");
+}
+function dokuText(id, d) {
+  const ph = (d.phasen || []).find((p) => /checkl/i.test(p.titel));
+  const o = ["# " + (ph ? ph.titel : "Checklëscht Dokumentatioun") + " – " + id, ""];
+  if (ph) d.aufgaben.filter((a) => a.phase === ph.id && view(a).ent !== "raus").forEach((a) => {
+    const v = view(a);
+    o.push("- [" + (v.status === "geprueft" ? "x" : v.status === "geliefert" ? "~" : " ") + "] " + txt(a) + (v.status === "nachbesserung" ? " – Nachbesserung" : "") + (v.notiz ? " – " + v.notiz : ""));
+  });
+  o.push("", "[x] geprüft · [~] geliefert, nach net gepréift · [ ] offen");
+  return o.join("\n");
+}
+function leitfadenDaten(d, mon) {
+  const s = new Date(jahr(mon), mon, 1), e = new Date(jahr(mon), mon + 1, 0), due = [], late = [], ong = [];
+  d.aufgaben.forEach((a) => {
+    const v = view(a); if (v.ent === "raus") return;
+    const f = fenster(a, phOf(d, a)); if (!f) return;
+    if (f.lafend) { ong.push(a); return; }
+    if (f.end && f.end < s && v.status !== "geprueft") late.push(a);
+    else if ((!f.start || f.start <= e) && f.end && f.end >= s) due.push(a);
+  });
+  return { due, late, ong };
+}
+
+/* ---------- Backend ---------- */
+const MOCK_DB = {};
+async function ladePersonen() {
+  if (MOCK) return ["26-2GSE-91", "26-2GSE-92"];
+  const r = await fetch(WEB_APP_URL + "?namen=1&token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""));
+  const d = await r.json();
+  return (d.personen || []).filter((p) => p.rolle === "Schüler" && /2GSE/.test(p.klasse || p.numm || "")).map((p) => p.numm).sort();
+}
+async function ladeListen() {
+  if (MOCK) return MOCK_DB;
+  const r = await fetch(WEB_APP_URL + "?aufgabenListe=1&token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""));
+  const d = await r.json();
+  if (!d.ok) throw new Error(d.error || "Feeler beim Lueden");
+  const out = {};
+  (d.listen || []).forEach((z) => { try { out[z.schueler] = { version: z.version, inhalt: JSON.parse(z.inhalt) }; } catch (e) {} });
+  return out;
+}
+async function speichereListe(id, version, inhalt) {
+  if (MOCK) { const v = (MOCK_DB[id]?.version || 0) + 1; MOCK_DB[id] = { version: v, inhalt }; return { ok: true, version: v }; }
+  const res = await fetch(WEB_APP_URL, {
+    method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ typ: "aufgabenListeSpeichern", proffToken: window.PPREN_SESSION?.token, schueler: id, klasse: "2GSE", version, inhalt: JSON.stringify(inhalt) }),
+  });
+  return res.json();
+}
+
+/* ---------- UI ---------- */
+const Vs = () => <span className="vs">Virschlag</span>;
+
+function Zeile({ a, ph, onChange }) {
+  const v = view(a), am = ampel(a, ph);
+  const set = (p) => onChange({ ...a, ...p });
+  return (
+    <div className={"t e-" + v.ent}>
+      <div className="row">
+        <div className="tx">
+          {am && <span className={"amp " + am} title={AMP_T[am]}></span>}
+          <span className="txt">{a.text}</span>
+          {a.zeitfenster && <span className="zf">{a.zeitfenster}</span>}
+          {a.herkunft && <span className={"h " + a.herkunft}>{a.herkunft}</span>}
+        </div>
+        <div className="eg">
+          {ENT.map(([k, l]) => (
+            <button key={k} className={"eb " + k + (v.ent === k ? " on" : "")}
+              onClick={() => set({ entscheidung: v.ent === k ? "offen" : k, neuerText: k === "aendern" && !v.neu ? a.text : a.neuerText })}>{l}</button>
+          ))}
+        </div>
+      </div>
+      {v.ent === "aendern" && (
+        <div className="det"><textarea className="neu" rows={Math.max(2, Math.ceil((v.neu || a.text).length / 90))} value={v.neu || a.text}
+          onChange={(e) => set({ neuerText: e.target.value })} /></div>
+      )}
+      {v.ent !== "raus" && (
+        <div className="det">
+          <select value={v.status} onChange={(e) => { const s = e.target.value; set({ status: s, erledigt: s === "geprueft", datum: s !== "offen" && !v.datum ? heute() : v.datum, erledigtAm: s === "geprueft" ? (v.datum || heute()) : null }); }}>
+            {STATUS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+          <input type="date" value={v.datum} title="Datum (geliwwert/gepréift)" onChange={(e) => set({ datum: e.target.value })} />
+          <input className="no" type="text" placeholder="Notiz …" value={v.notiz} onChange={(e) => set({ notiz: e.target.value })} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Leitfaden({ id, d, mon, setMon, zureck }) {
+  const L = leitfadenDaten(d, mon);
+  const Lst = ({ titel, arr }) => (
+    <>
+      <h3>{titel}</h3>
+      {arr.length ? <ul>{arr.map((a) => <li key={a.id}>{txt(a)}{a.zeitfenster ? " (" + a.zeitfenster + ")" : ""}{view(a).status !== "offen" ? " – " + view(a).status : ""}</li>)}</ul> : <div className="sub">– keng –</div>}
+    </>
+  );
+  const kopieren = () => {
+    const o = ["Wochenbericht-Leitfaden " + id + " – " + MN[mon], ""];
+    [["Fälleg", L.due], ["Nach oppen", L.late], ["Lafend", L.ong]].forEach(([t, arr]) => { o.push(t + ":"); arr.forEach((a) => o.push("- " + txt(a))); o.push(""); });
+    try { navigator.clipboard.writeText(o.join("\n")); } catch (e) { download("Leitfaden_" + id + ".txt", o.join("\n")); }
+  };
+  return (
+    <div>
+      <div className="tools noprint">
+        <button className="b" onClick={zureck}>← zréck</button>
+        <select className="b" value={mon} onChange={(e) => setMon(+e.target.value)}>
+          {[10, 11, 0, 1, 2, 3, 4, 5].map((m) => <option key={m} value={m}>{MN[m]} {jahr(m)}</option>)}
+        </select>
+        <Vs />
+        <button className="b" onClick={() => window.print()}>Drécken</button>
+        <button className="b" onClick={kopieren}>Als Text kopéieren</button>
+      </div>
+      <h3>{id} · Wochenbericht-Leitfaden · {MN[mon]} {jahr(mon)}</h3>
+      <div className="hint"><b>Am Wochenbericht soll stoen:</b> Wat gouf déi Woch gemaach? · Wat ass gelongen / wat net (a firwat)? · Gespréicher mat de Proffen · Wat ass déi nächst Woch gepland? · Zu wéi enge Punkte vun der Lëscht hues du geschafft?</div>
+      <Lst titel={"Fälleg am " + MN[mon]} arr={L.due} />
+      <Lst titel="Nach oppen aus de Méint virdrun" arr={L.late} />
+      <Lst titel="Lafend (all Woch)" arr={L.ong} />
+    </div>
+  );
+}
+
+function App() {
+  const [ids, setIds] = useState([]);
+  const [listen, setListen] = useState({});     // id -> {version, inhalt}
+  const [aktiv, setAktiv] = useState("uebersicht");
+  const [filter, setFilter] = useState("alles");
+  const [leit, setLeit] = useState(false);
+  const [mon, setMon] = useState(new Date().getMonth());
+  const [stat, setStat] = useState({ t: "Lueden …", err: false });
+  const [dirty, setDirty] = useState({});
+  const timers = useRef({});
+  const fileRef = useRef(null);
+
+  const lade = async () => {
+    try {
+      const [p, l] = await Promise.all([ladePersonen(), ladeListen()]);
+      const all = Array.from(new Set([...p, ...Object.keys(l)])).sort();
+      setIds(all); setListen({ ...l }); setStat({ t: "Gelueden.", err: false });
+    } catch (e) { setStat({ t: "Feeler: " + e.message, err: true }); }
+  };
+  useEffect(() => { lade(); }, []);
+
+  const aendere = (id, inhalt) => {
+    setListen((L) => ({ ...L, [id]: { ...(L[id] || { version: 0 }), inhalt } }));
+    setStat({ t: "Ännerung net gespäichert …", err: false });
+    clearTimeout(timers.current[id]);
+    timers.current[id] = setTimeout(() => speichere(id, inhalt), 900);
+  };
+  const speichere = async (id, inhalt) => {
+    const version = (listenRef.current[id] || {}).version || 0;
+    try {
+      const r = await speichereListe(id, version, inhalt);
+      if (!r.ok) {
+        if (/zwischenzäitlech|zwischenzeitlech|Versioun/i.test(r.error || "")) { setStat({ t: "Zwischenzäitlech vun engem aneren geännert – lueden nei. Deng Ännerung ass net gespäichert!", err: true }); await lade(); return; }
+        throw new Error(r.error || "Onbekannte Feeler");
+      }
+      setListen((L) => ({ ...L, [id]: { ...L[id], version: r.version } }));
+      setStat({ t: "Gespäichert " + new Date().toLocaleTimeString(), err: false });
+    } catch (e) { setStat({ t: "Späicherfeeler: " + e.message, err: true }); }
+  };
+  const listenRef = useRef({});
+  listenRef.current = listen;
+
+  const importieren = async (ev) => {
+    const fs = [...ev.target.files]; let n = 0;
+    for (const f of fs) {
+      try {
+        const j = JSON.parse(await f.text());
+        if (!j.schueler || !Array.isArray(j.aufgaben)) throw new Error("Format");
+        if (listen[j.schueler]) { if (!confirm(j.schueler + " huet schonn eng Lëscht. Mat der Datei ERSETZEN (Entscheedungen/Status ginn iwwerschriwwen)?")) continue; }
+        if (!ids.includes(j.schueler)) setIds((x) => [...x, j.schueler].sort());
+        const meta = { schueler: j.schueler, titel: j.titel || "", phasen: j.phasen || [], aufgaben: j.aufgaben };
+        aendere(j.schueler, meta); n++;
+      } catch (e) { setStat({ t: "Import: " + f.name + " net lieshar (" + e.message + ")", err: true }); }
+    }
+    if (n) setStat({ t: n + " Datei(en) importéiert, späicheren …", err: false });
+    ev.target.value = "";
+  };
+
+  const d = listen[aktiv]?.inhalt;
+  const mkChange = (a2) => aendere(aktiv, { ...d, aufgaben: d.aufgaben.map((x) => (x.id === a2.id ? a2 : x)) });
+  const passt = (a, ph) => {
+    const v = view(a);
+    if (filter === "offen") return v.ent !== "raus" && v.status === "offen";
+    if (filter === "ueberfaellig") return ampel(a, ph) === "ueberfaellig";
+    if (filter === "nachbesserung") return v.status === "nachbesserung";
+    if (filter === "ongeklaert") return v.ent === "offen";
+    return true;
+  };
+
+  return (
+    <div className="wrap">
+      {MOCK && <div className="mock">TEST-MODUS (?mock=1): Fantasie-Daten, nichts gëtt un de Server geschéckt.</div>}
+      <h1>Aufgaben bis Juni · 2GSE</h1>
+      <div className={"state" + (stat.err ? " err" : "")}>{stat.t} · Nëmme Lehrer · Inhalt verschlësselt am Sheet · Schüler gesinn näischt</div>
+      <div className="tabs">
+        <button className={"tab" + (aktiv === "uebersicht" ? " on" : "")} onClick={() => { setAktiv("uebersicht"); setLeit(false); }}>Iwwersiicht</button>
+        {ids.map((id) => { const c = zaehl(listen[id]?.inhalt); return (
+          <button key={id} className={"tab" + (aktiv === id ? " on" : "")} onClick={() => { setAktiv(id); setLeit(false); }}>{id.replace("26-", "")}<span className="p">{c ? c.p + "%" : "–"}</span></button>
+        ); })}
+      </div>
+      <div className="panel">
+        {aktiv === "uebersicht" && (
+          <>
+            <h3>Alle Schüler <Vs /></h3>
+            <table>
+              <thead><tr>{["ID", "Bleift", "Änneren", "Raus", "ongeklärt", "geliefert", "geprüft", "Nachbess.", "fälleg", "iwwerfälleg", "% geprüft"].map((x, i) => <th key={x} className={i ? "n" : ""}>{x}</th>)}</tr></thead>
+              <tbody>
+                {ids.map((id) => { const c = zaehl(listen[id]?.inhalt); return (
+                  <tr key={id}>
+                    <td style={{ cursor: "pointer" }} onClick={() => setAktiv(id)}>{id}</td>
+                    {c ? [c.bleibt, c.aendern, c.raus, c.offen, c.geliefert, c.geprueft, c.nachb, c.faellig, c.ueber, c.p + " %"].map((x, i) => <td key={i} className="n">{x}</td>) : <td colSpan={10}>nach keng Aufgaben (JSON importéieren)</td>}
+                  </tr>
+                ); })}
+              </tbody>
+            </table>
+            <div className="sub">„fälleg“/„iwwerfälleg“ gi vum Zäitfënster (Mount) ofgeleet; Punkte „Raus“ zielen net mat.</div>
+          </>
+        )}
+        {aktiv !== "uebersicht" && !d && <div className="sub">Fir {aktiv} gëtt et nach keng Aufgaben. Ënnen „JSON importéieren“ (daten/{aktiv}.json).</div>}
+        {aktiv !== "uebersicht" && d && leit && <Leitfaden id={aktiv} d={d} mon={mon} setMon={setMon} zureck={() => setLeit(false)} />}
+        {aktiv !== "uebersicht" && d && !leit && (() => {
+          const c = zaehl(d);
+          return (
+            <>
+              <h3>{aktiv}{d.titel ? " · " + d.titel : ""}</h3>
+              <div className="bar"><i style={{ width: c.p + "%" }} /></div>
+              <div className="prog">geprüft {c.geprueft}/{c.n} ({c.p} %) · geliefert {c.geliefert} · Nachbesserung {c.nachb} · iwwerfälleg {c.ueber} · ongeklärt (Bleift/Änneren/Raus) {c.offen}</div>
+              <div className="tools" style={{ marginTop: 0 }}>
+                <select className="b" value={filter} onChange={(e) => setFilter(e.target.value)}>
+                  <option value="alles">Filter: alles</option><option value="offen">offen (kee Status)</option><option value="ueberfaellig">iwwerfälleg</option><option value="nachbesserung">Nachbesserung</option><option value="ongeklaert">ongeklärt</option>
+                </select><Vs />
+                <button className="b" onClick={() => setLeit(true)}>Wochenbericht-Leitfaden</button>
+                <button className="b" onClick={() => download("Aufgaben_" + aktiv + ".md", schuelerText(aktiv, d), "text/markdown")}>Fir Schüler (.md)</button>
+                <button className="b" onClick={() => download("Doku-Checklescht_" + aktiv + ".md", dokuText(aktiv, d), "text/markdown")}>Doku-Checklëscht (.md)</button>
+              </div>
+              {(d.phasen || []).map((ph) => {
+                const as = d.aufgaben.filter((a) => a.phase === ph.id && passt(a, ph));
+                if (!as.length) return null;
+                return (
+                  <div key={ph.id}>
+                    <h2>{ph.titel}<small>{as.length}/{d.aufgaben.filter((a) => a.phase === ph.id).length}</small></h2>
+                    {as.map((a) => <Zeile key={a.id} a={a} ph={ph} onChange={mkChange} />)}
+                  </div>
+                );
+              })}
+            </>
+          );
+        })()}
+        <div className="tools noprint">
+          <button className="b" onClick={() => fileRef.current.click()}>JSON importéieren (daten/&lt;ID&gt;.json)</button>
+          <button className="b" onClick={lade}>Nei lueden</button>
+          <input ref={fileRef} type="file" accept=".json" multiple style={{ display: "none" }} onChange={importieren} />
+        </div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
