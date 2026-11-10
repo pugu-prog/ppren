@@ -159,6 +159,7 @@ function leitfadenDaten(d, mon) {
 
 /* ---------- Backend ---------- */
 const MOCK_DB = {};
+let BACKEND_OK = false; // gëtt eréischt no der Versiounsprüfung wouer
 async function ladePersonen() {
   if (MOCK) return ["26-2GSE-91", "26-2GSE-92"];
   const r = await fetch(WEB_APP_URL + "?namen=1&token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""));
@@ -167,6 +168,10 @@ async function ladePersonen() {
 }
 async function ladeListen() {
   if (MOCK) return MOCK_DB;
+  // Backend vor Frontend: nëmme schaffen, wann d'Backend d'Aufgaben-Lëscht kennt (Vorfall 26.10.2026)
+  const v = await (await fetch(WEB_APP_URL + "?version=1")).json();
+  if (!(v.features || []).includes("aufgabenListe")) throw new Error("Backend nach net deployt (Versioun " + String(v.version || "?").slice(0, 11) + "). Fir ze testen: ?mock=1");
+  BACKEND_OK = true;
   const r = await fetch(WEB_APP_URL + "?aufgabenListe=1&token=" + encodeURIComponent(window.PPREN_SESSION?.token || ""));
   const d = await r.json();
   if (!d.ok) throw new Error(d.error || "Feeler beim Lueden");
@@ -176,6 +181,7 @@ async function ladeListen() {
 }
 async function speichereListe(id, version, inhalt) {
   if (MOCK) { const v = (MOCK_DB[id]?.version || 0) + 1; MOCK_DB[id] = { version: v, inhalt }; return { ok: true, version: v }; }
+  if (!BACKEND_OK) return { ok: false, error: "Backend nach net deployt – näischt gespäichert." };
   const res = await fetch(WEB_APP_URL, {
     method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({ typ: "aufgabenListeSpeichern", proffToken: window.PPREN_SESSION?.token, schueler: id, klasse: "2GSE", version, inhalt: JSON.stringify(inhalt) }),
