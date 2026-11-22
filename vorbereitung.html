@@ -358,9 +358,8 @@ function zeichneKaart(daten, id, heut, termin) {
   h += '<div class="aktion">';
   h += '<button class="btn" data-akt="analyse"' + (z.beschäftegt ? " disabled" : "") + ">🤖 " + (ki ? "KI-Analyse neu" : "KI-Analyse") + "</button>";
   if (ki) h += '<button class="btn" data-akt="entwurf">↧ KI-Entwurf ins Feedback übernehmen</button>';
-  h += '<label class="klee"><input type="checkbox" data-sichtbar="1"' + (z.sichtbar ? " checked" : "") + "> für Schüler sichtbar (im Suivi)</label>";
-  h += '<button class="btn voll" data-akt="speichern"' + (z.beschäftegt ? " disabled" : "") + ">💾 Feedback speichern</button>";
-  h += '<span class="status">' + esc(z.meldung || (z.gespaichert ? "gespeichert " + z.gespaichert + (z.sichtbar ? " · für den Schüler sichtbar" : " · noch nicht sichtbar") : "")) + "</span>";
+  h += '<button class="btn voll" data-akt="kopieren">📋 Gesamtkommentar kopieren → Bericht in „Ziler iwwerpréiwen“</button>';
+  h += '<span class="status klee">Punkten + Zwëschebericht (mat Fräigab fir de Schüler) gi NACH dem Gespréich an „Ziler iwwerpréiwen“ erfaasst.</span>';
   h += "</div></div>";
   return h;
 }
@@ -509,7 +508,11 @@ async function feedbackSpeichern(id) {
     const akt = b.getAttribute("data-akt");
     if (akt === "analyse") analyseStarten(id);
     else if (akt === "entwurf") entwurfUebernehmen(id);
-    else if (akt === "speichern") feedbackSpeichern(id);
+    else if (akt === "kopieren") {
+      const z = zustandVun(id);
+      const text = (z.gesamt || "").trim();
+      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.resolve()).catch(() => {}).finally(() => { window.open("zieluewerpreiwung.html", "_blank"); });
+    }
   });
 
   const laden = async () => {

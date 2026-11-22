@@ -466,7 +466,7 @@ function App() {
     const zeitleischt = [
       ...meilensteng.map((m) => ({ art: "meilensteen", datum: m.datum, titel: m.titel, status: m.status, quell: m.quell, kategorie: m.kategorie })),
       ...fachgespraeche.map((f) => ({ art: "fachgespraech", datum: f.Datum, titel: `Fachgespréich — ${f.Periode}`, gesamt: f.Gesamt })),
-      ...zieluewerpreiwungen.map((z) => ({ art: "ziler", datum: z.Datum, titel: `Ziel-Iwwerpréiwung Termin ${z.Termin} — ${z.Periode}`, punkte: z.Punkte, max: z.Max })),
+      ...zieluewerpreiwungen.map((z) => ({ art: "ziler", datum: z.Datum, titel: `${z.Termin}. Zwischengespräch — ${z.Periode}`, punkte: z.Punkte, max: z.Max, bericht: z.Bericht || "" })),
     ]
       .filter((x) => x.datum)
       .sort((a, b) => String(a.datum).localeCompare(String(b.datum)));
@@ -898,6 +898,7 @@ function App() {
                             <span className="journal-status journal-status-neutral">{item.punkte} / {item.max}</span>
                           </div>
                           <span className="journal-titel-klengt">🎯 {item.titel}</span>
+                          {item.bericht && <div className="journal-bericht" style={{ whiteSpace: "pre-wrap", marginTop: 6, fontSize: 13.5, background: "#eaf6ee", border: "1px solid #cfe8d7", borderRadius: 8, padding: "6px 10px" }}>{item.bericht}</div>}
                         </div>
                       </div>
                     );

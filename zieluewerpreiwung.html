@@ -91,6 +91,11 @@ function App() {
   const [punkte, setPunkte] = useState("");
   const [max, setMax] = useState("11");
   const [notiz, setNotiz] = useState("");
+  const [sichtbar, setSichtbar] = useState(false);
+  const [backendNei, setBackendNei] = useState(null);
+  useEffect(() => {
+    fetch(WEB_APP_URL + "?version=1").then((r) => r.json()).then((d) => setBackendNei((d.features || []).includes("zwischenbericht"))).catch(() => setBackendNei(false));
+  }, []);
   const [bisherig, setBisherig] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -119,7 +124,7 @@ function App() {
     setTermin(bestehend + 1);
   }, [periode, bisherig]);
 
-  const canSubmit = schuelerId && periode && punkte !== "" && max !== "";
+  const canSubmit = schuelerId && periode && punkte !== "" && max !== "" && backendNei === true;
 
   const speicheren = async () => {
     if (!canSubmit) return;
@@ -135,7 +140,8 @@ function App() {
           schueler: currentSchueler.name, klasse: currentSchueler.klasse,
           periode, termin, datum,
           punkte: Number(punkte), max: Number(max),
-          notiz,
+          id: (bisherig.find((z) => z.Periode === periode && Number(z.Termin) === Number(termin)) || {}).ID,
+          bericht: notiz, sichtbar,
         }),
       });
       const data = await res.json();
@@ -143,6 +149,7 @@ function App() {
       setToast("Ziel-Iwwerpréiwung gespäichert.");
       setPunkte("");
       setNotiz("");
+      setSichtbar(false);
       lade();
     } catch (e) {
       setError("Konnte net späicheren: " + e.message);
@@ -216,8 +223,14 @@ function App() {
             </section>
 
             <section className="card">
-              <h2>4. Notiz (optional)</h2>
-              <textarea className="textarea" rows={3} placeholder="Wat gouf besprach, Beobachtungen..." value={notiz} onChange={(e) => setNotiz(e.target.value)} />
+              <h2>4. Zwëschebericht</h2>
+              <textarea className="textarea" rows={5} placeholder="Kuerzen Zwëschebericht: wat gouf besprach, wat leeft gutt, nächst Schrëtt …" value={notiz} onChange={(e) => setNotiz(e.target.value)} />
+              <label className="field-label" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+                <input type="checkbox" checked={sichtbar} onChange={(e) => setSichtbar(e.target.checked)} />
+                Fir de Schüler am Suivi fräigi ({termin}. Zwischengespräch) — nëmmen nodeems ech et gelies hunn
+              </label>
+              <p className="hint">Gëtt verschlësselt gespäichert a vun do an d'Bewertung (Kommentar, „{termin}. Zwischengespräch“) iwwerholl. De Schüler gesäit näischt, bis d'Këscht ugehäkt ass.</p>
+              {backendNei === false && <div className="sync-error">Backend nach net aktualiséiert (neie Apps-Script-Deploy feelt) — Späicheren ass gespaart.</div>}
             </section>
 
             <div className="actions">
@@ -238,7 +251,7 @@ function App() {
               <section className="card">
                 <h2>Bisherech Rendez-vousen — {currentSchueler.name}{currentSchueler.virnumm ? ` · ${currentSchueler.virnumm}` : ""}</h2>
                 <table className="tabelle">
-                  <thead><tr><th>Periode</th><th>Termin</th><th>Datum</th><th>Punkten</th></tr></thead>
+                  <thead><tr><th>Periode</th><th>Termin</th><th>Datum</th><th>Punkten</th><th>Schüler</th></tr></thead>
                   <tbody>
                     {bisherig.map((z, i) => (
                       <tr key={i}>
@@ -246,6 +259,7 @@ function App() {
                         <td>{z.Termin}</td>
                         <td>{z.Datum}</td>
                         <td>{z.Punkte} / {z.Max}</td>
+                        <td>{z.Sichtbar === "Jo" ? "👁️ fräigi" : (z.Bericht ? "🔒 privat" : "–")}</td>
                       </tr>
                     ))}
                   </tbody>
