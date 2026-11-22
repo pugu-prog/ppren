@@ -7,6 +7,7 @@
 <title>PPREN Mäin Suivi</title>
 <script src="auth-guard.js"></script>
 <script src="wochenberichte-luecken.js"></script>
+<script src="../ppren-latex/ppren-latex.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -352,6 +353,7 @@ function App() {
   const [error, setError] = useState(null);
   const [geladen, setGeladen] = useState(false);
   const [suiviPdfGenerating, setSuiviPdfGenerating] = useState(false);
+  const [latexMeldung, setLatexMeldung] = useState("");
   const [wbOffenId, setWbOffenId] = useState(null);
   const [rasterVunBackend, setRasterVunBackend] = useState(null);
 
@@ -381,7 +383,7 @@ function App() {
         setAusgaben((data.ausgaben || []).filter((a) => a.Schüler === currentSchueler.name));
         setRendezvousen((data.rendezvousen || []).filter((r) => r.Schüler === currentSchueler.name));
         // Referenzfassung vum Projektplang (vum Prof eropgeluede PDF, Dateinumm fänkt mat "Referenz" un)
-        setReferenzPdfs((data.plangFeedbackPdfs || []).filter((f) => f.Schüler === currentSchueler.name && /^referenz/i.test(String(f.Dateiname || ""))));
+        setReferenzPdfs((data.plangFeedbackPdfs || []).filter((f) => f.Schüler === currentSchueler.name && /^referenz/i.test(String(f.Dateiname || "")) && (!istSchueler || !/lehrer/i.test(String(f.Dateiname || "")))));
 
         let gespäichert = [];
         const eintrag = (data.meilensteng || []).find((m) => m.Schüler === currentSchueler.name);
@@ -417,10 +419,18 @@ function App() {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      // Backend gëtt éischt d'Google-Docs-PDF (falscht Deckblat) a mellt en LaTeX-Optrag. Mir rechnen en HEI direkt
+      // am Browser (selwechte Code wéi Dashboard: ppren-latex.js) a weisen de Link ERST duerno.
+      const L = window.PprenLatex;
+      if (!L || !(await L.backendKann(WEB_APP_URL))) throw new Error("LaTeX am Browser net méiglech (Browser ze al oder Backend ouni latexBrowser). D'PDF ass nach d'Docs-Fassung mat falschem Deckblat – net benotzen.");
+      const r = await L.optraegErneieren({ webAppUrl: WEB_APP_URL, token: window.PPREN_SESSION?.token || "", onStatus: setLatexMeldung });
+      if (!r || r.feeler > 0 || r.fertig === 0) throw new Error("LaTeX-PDF ass net fäerdeg ginn (" + (r ? r.feeler + " Feeler, " + r.fertig + " fäerdeg" : "keen Resultat") + "). D'PDF ass nach d'Docs-Fassung mat falschem Deckblat – net benotzen. Grond am Blat LatexOptraeg.");
       setProjekt((p) => (p ? { ...p, "Suivi-PDF-Link (Schüler)": data.url } : p));
+      alert("Suivi-PDF mat LaTeX-Deckblat ass fäerdeg." + (referenzPdfs.length ? " D'Referenzfassung steet nieft dem Link." : ""));
     } catch (e) {
       alert("Konnte de Suivi-PDF net generéieren: " + e.message);
     } finally {
+      setLatexMeldung("");
       setSuiviPdfGenerating(false);
     }
   };
@@ -649,7 +659,14 @@ function App() {
                   <a className="btn btn-ghost" href={projekt["Dokumentatioun-Link"]} rel="noreferrer">🔗 Dokumentatioun opmaachen</a>
                 )}
                 {projekt?.["Suivi-PDF-Link (Schüler)"] && (
-                  <a className="btn btn-ghost" href={projekt["Suivi-PDF-Link (Schüler)"]} rel="noreferrer">📄 Suivi als PDF opmaachen</a>
+                  <a className="btn btn-ghost" href={projekt["Suivi-PDF-Link (Schüler)"]} target="_blank" rel="noreferrer"
+                    onClick={() => { referenzPdfs.slice(-1).forEach((f) => window.open(f.Link, "_blank", "noopener")); }}>📄 Suivi als PDF opmaachen{referenzPdfs.length ? " (+ Referenzfassung)" : ""}</a>
+                )}
+                {projekt?.["Suivi-PDF-Link (Schüler)"] && referenzPdfs.slice(-1).map((f) => (
+                  <a key={f.ID} className="btn btn-ghost" href={f.Link} target="_blank" rel="noreferrer">📌 Referenzfassung</a>
+                ))}
+                {suiviPdfGenerating && latexMeldung && (
+                  <span className="feld-text">{latexMeldung}</span>
                 )}
                 {!istSchueler && projekt && (
                   <button type="button" className="btn btn-ghost" disabled={suiviPdfGenerating} onClick={suiviPdfGeneréieren}>

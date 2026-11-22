@@ -673,6 +673,11 @@ function App() {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      // Docs-PDF (falscht Deckblat) ERST duerch LaTeX-PDF ersetzen, dann de Link weisen
+      const L = window.PprenLatex;
+      if (!L || !(await L.backendKann(WEB_APP_URL))) throw new Error("LaTeX am Browser net méiglech – d'PDF ass nach d'Docs-Fassung (falscht Deckblat).");
+      const r = await L.optraegErneieren({ webAppUrl: WEB_APP_URL, token: window.PPREN_SESSION?.token || "", onStatus: setLatexStatus });
+      if (!r || r.feeler > 0 || r.fertig === 0) throw new Error("LaTeX-PDF net fäerdeg (" + (r ? r.feeler + " Feeler" : "?") + ") – d'PDF ass nach d'Docs-Fassung (falscht Deckblat). Grond am Blat LatexOptraeg.");
       setProjekte((ps) => ps.map((p) => (p.Schüler === schueler ? { ...p, "Suivi-PDF-Link (Schüler)": data.url } : p)));
       setBewertungen((bs) => bs.map((b) => (b.Schüler === schueler ? { ...b, "Suivi-PDF-Link (Schüler)": data.url } : b)));
     } catch (e) {
