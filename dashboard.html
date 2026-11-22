@@ -259,6 +259,25 @@ function App() {
   // "wiedereroeffnen" a "kommentarHinzefuegen" benotzen elo béid ee gemeinsamt
   // Fënster (kommentarModal) mat engem grousse Textfeld, amplaz vum wénzege
   // native prompt()-Popup, dat just eng Zeil weist.
+  const projektplanSchliessen = async (schueler) => {
+    if (!window.confirm("Projektplang vun " + schueler + " schléissen? De Schüler kann en duerno net méi änneren (Wiedereröffnen bleift méiglech).")) return;
+    setWiedereroeffnenId(schueler);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ typ: "projektplanSchliessen", proffToken: window.PPREN_SESSION?.token || "", schueler }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      setProjekte((ps) => ps.map((p) => (p.Schüler === schueler ? { ...p, Status: data.status } : p)));
+    } catch (e) {
+      alert("Konnt net schléissen: " + e.message);
+    } finally {
+      setWiedereroeffnenId(null);
+    }
+  };
+
   const oeffneKommentarModal = (schueler, klasse, mode) => {
     setKommentarModal({ schueler, klasse, mode });
     setKommentarModalText("");
@@ -827,6 +846,16 @@ function App() {
                         </div>
                       </td>
                       <td>
+                        {meta.key !== "done" && (
+                          <button
+                            className="btn-gen"
+                            disabled={wiedereroeffnenId === p.Schüler}
+                            onClick={() => projektplanSchliessen(p.Schüler)}
+                            title="Projektplang schléissen (Status: Freigegeben & digital unterschrieben) — de Schüler kann en net méi änneren"
+                          >
+                            {wiedereroeffnenId === p.Schüler ? "…" : "🔒 Schließen"}
+                          </button>
+                        )}
                         {(meta.key === "pending" || meta.key === "done") && (
                           <button
                             className="btn-gen btn-gen-warn"

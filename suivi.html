@@ -347,6 +347,7 @@ function App() {
   const [budgetInfo, setBudgetInfo] = useState(null); // { status, max } oder null wann näischt ugefrot
   const [ausgaben, setAusgaben] = useState([]);
   const [rendezvousen, setRendezvousen] = useState([]);
+  const [referenzPdfs, setReferenzPdfs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [geladen, setGeladen] = useState(false);
@@ -379,6 +380,8 @@ function App() {
         setBudgetInfo(meinBudget ? { status: meinBudget.Status, max: Number(meinBudget.Max) || 500 } : null);
         setAusgaben((data.ausgaben || []).filter((a) => a.Schüler === currentSchueler.name));
         setRendezvousen((data.rendezvousen || []).filter((r) => r.Schüler === currentSchueler.name));
+        // Referenzfassung vum Projektplang (vum Prof eropgeluede PDF, Dateinumm fänkt mat "Referenz" un)
+        setReferenzPdfs((data.plangFeedbackPdfs || []).filter((f) => f.Schüler === currentSchueler.name && /^referenz/i.test(String(f.Dateiname || ""))));
 
         let gespäichert = [];
         const eintrag = (data.meilensteng || []).find((m) => m.Schüler === currentSchueler.name);
@@ -627,6 +630,16 @@ function App() {
                   </ul>
                 ) : <p className="feld-text">{projekt ? "nicht erforderlich" : "–"}</p>}
               </div>
+
+              {referenzPdfs.length > 0 && (
+                <div className="feld-block" style={{ background: "#fff4e5", border: "1px solid #f5c27a", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
+                  <span className="feld-label">📌 Projektplan – Referenzfassung (gilt für die Bewertung)</span>
+                  <p className="feld-text" style={{ margin: "4px 0 8px" }}>Dein Projektplan ist abgeschlossen. Verbindlich für die Bewertung ist die Referenzfassung: dein Plan plus die Ergänzungen und Meilensteine deines Betreuers.</p>
+                  {referenzPdfs.map((f) => (
+                    <a key={f.ID} className="btn btn-ghost" href={f.Link} target="_blank" rel="noreferrer">📄 {f.Dateiname}</a>
+                  ))}
+                </div>
+              )}
 
               <div className="link-row">
                 {projekt?.["Projektplan-Link"] && (
