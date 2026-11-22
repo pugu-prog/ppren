@@ -92,6 +92,7 @@ function App() {
   const [max, setMax] = useState("11");
   const [notiz, setNotiz] = useState("");
   const [sichtbar, setSichtbar] = useState(false);
+  const [editID, setEditID] = useState(null);
   const [backendNei, setBackendNei] = useState(null);
   useEffect(() => {
     fetch(WEB_APP_URL + "?version=1").then((r) => r.json()).then((d) => setBackendNei((d.features || []).includes("zwischenbericht"))).catch(() => setBackendNei(false));
@@ -119,10 +120,23 @@ function App() {
 
   useEffect(() => {
     // Nächst fräi Terminnummer fir dës Period virschloen
-    if (!periode) return;
+    if (!periode || editID) return;
     const bestehend = bisherig.filter((z) => z.Periode === periode).length;
     setTermin(bestehend + 1);
-  }, [periode, bisherig]);
+  }, [periode, bisherig, editID]);
+
+  const beaarbechten = (z) => {
+    setEditID(z.ID);
+    setPeriode(z.Periode);
+    setTermin(Number(z.Termin) || 1);
+    setDatum(String(z.Datum || "").slice(0, 10) || datum);
+    setPunkte(String(z.Punkte));
+    setMax(String(z.Max || 11));
+    setNotiz(String(z.Bericht || z.Notiz || ""));
+    setSichtbar(z.Sichtbar === "Jo");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const ofbriechen = () => { setEditID(null); setPunkte(""); setNotiz(""); setSichtbar(false); };
 
   const canSubmit = schuelerId && periode && punkte !== "" && max !== "" && backendNei === true;
 
@@ -140,7 +154,7 @@ function App() {
           schueler: currentSchueler.name, klasse: currentSchueler.klasse,
           periode, termin, datum,
           punkte: Number(punkte), max: Number(max),
-          id: (bisherig.find((z) => z.Periode === periode && Number(z.Termin) === Number(termin)) || {}).ID,
+          id: editID || (bisherig.find((z) => z.Periode === periode && Number(z.Termin) === Number(termin)) || {}).ID,
           bericht: notiz, sichtbar,
         }),
       });
@@ -150,6 +164,7 @@ function App() {
       setPunkte("");
       setNotiz("");
       setSichtbar(false);
+      setEditID(null);
       lade();
     } catch (e) {
       setError("Konnte net späicheren: " + e.message);
@@ -177,7 +192,7 @@ function App() {
           <div className="grid3">
             <label className="field">
               <span className="field-label">Schüler/-in</span>
-              <select className="select" value={schuelerId} onChange={(e) => { setSchuelerId(e.target.value); setPeriode(""); }}>
+              <select className="select" value={schuelerId} onChange={(e) => { setSchuelerId(e.target.value); setPeriode(""); setEditID(null); }}>
                 <option value="">– auswählen –</option>
                 {SCHUELER.map((s) => <option key={s.id} value={s.id}>{s.virnumm ? `${s.virnumm} — ` : ""}{s.name} ({s.klasse})</option>)}
               </select>
@@ -199,7 +214,8 @@ function App() {
         {schuelerId && periode && (
           <>
             <section className="card">
-              <h2>2. Termin {termin} — Gespréichskritären</h2>
+              <h2>2. Termin {termin} — Gespréichskritären{editID ? " (bestoende Termin gëtt geännert)" : ""}</h2>
+              {editID && <p className="hint">Du ännerst e gespäicherten Termin. <button type="button" className="btn" onClick={ofbriechen}>Ofbriechen</button></p>}
               <p className="hint">Selwecht Kritären fir all Schüler — de Schüler huet sech doheem virbereet, et gëtt keng Virbereedungszäit hei.</p>
               <ul className="kritaeren-liste">
                 {KRITAEREN.map((k) => <li key={k}>{k}</li>)}
@@ -251,7 +267,7 @@ function App() {
               <section className="card">
                 <h2>Bisherech Rendez-vousen — {currentSchueler.name}{currentSchueler.virnumm ? ` · ${currentSchueler.virnumm}` : ""}</h2>
                 <table className="tabelle">
-                  <thead><tr><th>Periode</th><th>Termin</th><th>Datum</th><th>Punkten</th><th>Schüler</th></tr></thead>
+                  <thead><tr><th>Periode</th><th>Termin</th><th>Datum</th><th>Punkten</th><th>Schüler</th><th></th></tr></thead>
                   <tbody>
                     {bisherig.map((z, i) => (
                       <tr key={i}>
@@ -259,7 +275,8 @@ function App() {
                         <td>{z.Termin}</td>
                         <td>{z.Datum}</td>
                         <td>{z.Punkte} / {z.Max}</td>
-                        <td>{z.Sichtbar === "Jo" ? "👁️ fräigi" : (z.Bericht ? "🔒 privat" : "–")}</td>
+                        <td>{z.Sichtbar === "Jo" ? "👁️ fräigi" : ((z.Bericht || z.Notiz) ? "🔒 privat" : "–")}</td>
+                        <td><button type="button" className="btn" onClick={() => beaarbechten(z)}>✏️ Beaarbechten</button></td>
                       </tr>
                     ))}
                   </tbody>
