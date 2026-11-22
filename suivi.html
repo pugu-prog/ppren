@@ -269,8 +269,8 @@ function bauStrukturVunRaster(raster) {
 
 // Déiselwecht Faarfpalett wéi am Planungstool/Gantt-Chart, fir konsequent Faarwen
 // iwwerall wou Meilensteng-Kategorien ugewisen ginn.
-const KATEGORIE_FARWEN = { "Event": "#f0ec3a", "Iwwerpréiwung": "#d9d3f5", "Praktesch Phase": "#1ecdc4", "Ofgab": "#a9d92d", "Eegen": "#F67E1B", "Projektplang": "#5b9bd5" };
-const KATEGORIE_TEXT = { "Event": "#1c2621", "Iwwerpréiwung": "#1c2621", "Praktesch Phase": "#04342c", "Ofgab": "#1c2621", "Eegen": "#ffffff", "Projektplang": "#ffffff" };
+const KATEGORIE_FARWEN = { "Event": "#f0ec3a", "Iwwerpréiwung": "#d9d3f5", "Praktesch Phase": "#1ecdc4", "Ofgab": "#a9d92d", "Eegen": "#F67E1B", "Projektplang": "#5b9bd5", "Referenz": "#e8590c" };
+const KATEGORIE_TEXT = { "Event": "#1c2621", "Iwwerpréiwung": "#1c2621", "Praktesch Phase": "#04342c", "Ofgab": "#1c2621", "Eegen": "#ffffff", "Projektplang": "#ffffff", "Referenz": "#ffffff" };
 
 function sicherJson(text, fallback) {
   if (!text) return fallback;
@@ -393,7 +393,7 @@ function App() {
           .map((m) => ({ titel: m.Titel, datum: m.Datum, status: "Ausstoend", quell: "Offiziell", kategorie: m.Kategorie || "Event" }));
         const eegenUndProjektplang = gespäichert
           .filter((m) => m.titel && m.datum && m.quell !== "Vakanz")
-          .map((m) => ({ titel: m.titel, datum: m.datum, status: m.status || "Ausstoend", quell: m.quell || "Eegen", kategorie: m.quell === "Projektplang" ? "Projektplang" : "Eegen" }));
+          .map((m) => ({ titel: m.titel, datum: m.datum, status: m.status || "Ausstoend", quell: m.quell || "Eegen", kategorie: m.quell === "Projektplang" ? "Projektplang" : m.quell === "Referenz" ? "Referenz" : "Eegen" }));
         const alleMeilensteng = [...offiziell, ...eegenUndProjektplang]
           .filter((m, i, arr) => arr.findIndex((x) => x.titel === m.titel) === i)
           .sort((a, b) => (a.datum || "").localeCompare(b.datum || ""));

@@ -61,8 +61,8 @@ function ersteDatumVunWoche(wocheLabel) {
 }
 
 const STATUS_OPTIONEN = ["Ausstoend", "Erreecht", "Verspéit"];
-const KATEGORIE_FARWEN = { "Event": "#f0ec3a", "Iwwerpréiwung": "#d9d3f5", "Praktesch Phase": "#1ecdc4", "Ofgab": "#a9d92d", "Eegen": "#F67E1B", "Vakanz": "#b3d9e8", "Projektplang": "#5b9bd5" };
-const KATEGORIE_TEXT = { "Event": "#1c2621", "Iwwerpréiwung": "#1c2621", "Praktesch Phase": "#04342c", "Ofgab": "#1c2621", "Eegen": "#ffffff", "Vakanz": "#1c4a5e", "Projektplang": "#ffffff" };
+const KATEGORIE_FARWEN = { "Event": "#f0ec3a", "Iwwerpréiwung": "#d9d3f5", "Praktesch Phase": "#1ecdc4", "Ofgab": "#a9d92d", "Eegen": "#F67E1B", "Vakanz": "#b3d9e8", "Projektplang": "#5b9bd5", "Referenz": "#e8590c" };
+const KATEGORIE_TEXT = { "Event": "#1c2621", "Iwwerpréiwung": "#1c2621", "Praktesch Phase": "#04342c", "Ofgab": "#1c2621", "Eegen": "#ffffff", "Vakanz": "#1c4a5e", "Projektplang": "#ffffff", "Referenz": "#ffffff" };
 const VAKANZ_ZEILEN = VAKANZEN_2026_27.map((v) => ({
   id: "vak-" + v.start, datum: v.start, datumEnn: v.end, titel: v.label, kategorie: "Vakanz", quell: "Vakanz", status: "", notiz: "",
 }));
@@ -106,6 +106,7 @@ function App() {
   const [eegenMeilensteng, setEegenMeilensteng] = useState([]); // nëmmen eege, editéierbar
   const [offiziell, setOffiziell] = useState([]); // vum Server, nëmmen liesen
   const [projektplang, setProjektplang] = useState([]); // Projektplang-Meilensteng, Status/Notiz editéierbar
+  const [referenz, setReferenz] = useState([]); // Referenz-Meilensteng (vum Prof), gespaart, Status/Notiz editéierbar
   const [wochenberichte, setWochenberichte] = useState([]); // fir Detailer-Opklapp
   const [opklapp, setOpklapp] = useState(null); // ID vum Meilensteen, deen opgeklappt ass (nëmmen ee gläichzäiteg)
   const [loading, setLoading] = useState(false);
@@ -163,6 +164,7 @@ function App() {
         // Projektplang-Meilensteng: kommen aus dem Projektplang-Formulaire (index.html),
         // Datum/Titel ginn do festgeluecht — hei Status/Notiz/Beschreiwung upassbar.
         setProjektplang(gespäichert.filter((m) => m.quell === "Projektplang").map((m) => ({ ...m, beschreiwung: m.beschreiwung || "" })));
+        setReferenz(gespäichert.filter((m) => m.quell === "Referenz").map((m) => ({ ...m, kategorie: "Referenz", beschreiwung: m.beschreiwung || "" })));
         setOffiziell(offiziellFuerKlass);
         // Inkl. ofgeschloss Wochen ouni Eintrag ("Net ofginn", zielt als 0 vu 5).
         setWochenberichte(window.PPREN_WB.mitLuecken([{ numm: s.name, rolle: "Schüler", klasse: s.klasse }], (data.wochenberichte || []).filter((w) => w.Schüler === s.name)));
@@ -177,6 +179,8 @@ function App() {
     setEegenMeilensteng((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch } : m)));
   const updateProjektplangZeil = (id, patch) =>
     setProjektplang((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  const updateReferenzZeil = (id, patch) =>
+    setReferenz((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch } : m)));
   const updateOffiziellZeil = (id, patch) =>
     setOffiziell((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch } : m)));
   const addZeil = () =>
@@ -187,8 +191,8 @@ function App() {
   // Fir d'Uweisung: offiziell (Liesen) + Projektplang (Status/Notiz editéierbar)
   // + eege (Schreiwen) + Vakanzen zesummen, no Datum sortéiert
   const alleZesummen = useMemo(
-    () => [...offiziell, ...projektplang, ...eegenMeilensteng, ...VAKANZ_ZEILEN].sort((a, b) => (a.datum || "").localeCompare(b.datum || "")),
-    [offiziell, projektplang, eegenMeilensteng]
+    () => [...offiziell, ...projektplang, ...referenz, ...eegenMeilensteng, ...VAKANZ_ZEILEN].sort((a, b) => (a.datum || "").localeCompare(b.datum || "")),
+    [offiziell, projektplang, referenz, eegenMeilensteng]
   );
 
   // Wochenberichter engem Meilensteen zouuerdnen: explizit Bezuch (aus dem
@@ -227,7 +231,7 @@ function App() {
       // Zeilen ginn komplett mat (Datum/Titel bleiwen d'selwecht wéi
       // gelueden, well se just am Projektplang-Formulaire änderbar sinn).
       const offiziellOverlay = offiziell.map((m) => ({ id: m.id, quell: "Offiziell", status: m.status, notiz: m.notiz, beschreiwung: m.beschreiwung }));
-      const zSpäicheren = [...eegenMeilensteng, ...offiziellOverlay, ...projektplang];
+      const zSpäicheren = [...eegenMeilensteng, ...offiziellOverlay, ...projektplang, ...referenz];
       const res = await fetch(WEB_APP_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -261,6 +265,7 @@ function App() {
 
   const zeilAktualiséieren = (m, patch) => {
     if (m.quell === "Projektplang") updateProjektplangZeil(m.id, patch);
+    else if (m.quell === "Referenz") updateReferenzZeil(m.id, patch);
     else if (m.quell === "Offiziell") updateOffiziellZeil(m.id, patch);
     else updateZeil(m.id, patch);
   };
@@ -313,7 +318,7 @@ function App() {
                   <button className="btn-gen" onClick={csvExport}>⬇️ CSV</button>
                 </div>
               </div>
-              <p className="hint">🔒 Offiziell Meilensteng (gro) kommen automatesch vum Prof. 📝 Projektplang-Meilensteng (blo) kommen aus dengem <a href={`index.html`}>Projektplang-Formulaire</a> — Datum/Titel do änneren, Status/Notiz hei. Deng eege Meilensteng (orange) kanns du fréi bearbechten. Kléck op ▾ fir méi Detailer (Beschreiwung + verlinkte Wochenberichter).</p>
+              <p className="hint">🔒 Offiziell Meilensteng (gro) kommen automatesch vum Prof. 📝 Projektplang-Meilensteng (blo) kommen aus dengem <a href={`index.html`}>Projektplang-Formulaire</a> — Datum/Titel do änneren, Status/Notiz hei. 🎯 Referenz-Meilensteng (rout-orange) stellt de Prof als Referenz — Datum/Titel sinn gespaart, Status/Notiz hei. Deng eege Meilensteng (orange) kanns du fréi bearbechten. Kléck op ▾ fir méi Detailer (Beschreiwung + verlinkte Wochenberichter).</p>
               <div className="tabelle-wrap">
                 <table className="tabelle">
                   <thead>
@@ -324,6 +329,7 @@ function App() {
                       const istOffiziell = m.quell === "Offiziell";
                       const istVakanz = m.quell === "Vakanz";
                       const istProjektplang = m.quell === "Projektplang";
+                      const istReferenz = m.quell === "Referenz";
                       const konflikt = !istVakanz && pruefVakanzOderFeierdag(m.datum);
                       const verlinktWB = wbFuerMeilensteen[m.titel] || [];
                       const iOpklappt = opklapp === m.id;
@@ -338,7 +344,27 @@ function App() {
                         );
                       }
 
-                      const zeilInhalt = istProjektplang ? (
+                      const zeilInhalt = istReferenz ? (
+                        <>
+                          <td>
+                            <span className="datum-gespaart" title="Referenz vum Prof — gespaart">🎯 {m.datum}</span>
+                            {konflikt && <div className="vakanz-hint">🏖️ {konflikt}</div>}
+                          </td>
+                          <td><span className="titel-gespaart">{m.titel}</span></td>
+                          <td>
+                            <span className="kategorie-badge" style={{ background: KATEGORIE_FARWEN.Referenz, color: KATEGORIE_TEXT.Referenz }}>Referenz</span>
+                          </td>
+                          <td>
+                            <select className="select" value={m.status} onChange={(e) => updateReferenzZeil(m.id, { status: e.target.value })}>
+                              {STATUS_OPTIONEN.map((s) => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </td>
+                          <td>
+                            <input className="input" placeholder="optional" value={m.notiz || ""} onChange={(e) => updateReferenzZeil(m.id, { notiz: e.target.value })} />
+                          </td>
+                          <td></td>
+                        </>
+                      ) : istProjektplang ? (
                         <>
                           <td>
                             <span className="datum-gespaart" title="Am Projektplang-Formulaire festgeluecht">📝 {m.datum}</span>
@@ -389,7 +415,7 @@ function App() {
 
                       return (
                         <React.Fragment key={m.id}>
-                          <tr className={istOffiziell || istProjektplang ? "zeil-gespaart" : ""}>
+                          <tr className={istOffiziell || istProjektplang || istReferenz ? "zeil-gespaart" : ""}>
                             {zeilInhalt}
                             <td>
                               <button
