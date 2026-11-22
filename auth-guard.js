@@ -236,6 +236,60 @@
       setTimeout(bäisetzen, 0);
     }
   }
+  // Pop-up "Neie Rendez-vous" (NËMMEN Schüler): weist zukünfteg, nach net bestätegt Rendez-vousen.
+  // "Gesinn" gëtt am Backend gespäichert (gëlt op all Apparater). Fehler/aalt Backend -> roueg.
+  function fügRendezvousPopupBäi() {
+    if (rolle !== "Schüler") return;
+    const API = "https://script.google.com/macros/s/AKfycbymF-ntji7pYfnRIYxgRREtxVTUUgP38AHUjlbcpxyumpT3G2B1WdBf4M1ehmjXL4c/exec";
+    const FONT = "font-family:-apple-system,'Segoe UI',Inter,Arial,sans-serif";
+    const TAG = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+    function el(tag, css, text) {
+      const e = document.createElement(tag);
+      if (css) e.style.cssText = css;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    }
+    function wochentag(d) {
+      const m = String(d).match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+      return m ? TAG[new Date(+m[3], +m[2] - 1, +m[1]).getDay()] + " " : "";
+    }
+    function weisen(liste) {
+      if (document.getElementById("ppren-rv-popup")) return;
+      const overlay = el("div", "position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;padding:16px;" + FONT);
+      overlay.id = "ppren-rv-popup";
+      const box = el("div", "background:#fff;color:#1c2621;border-radius:14px;max-width:440px;width:100%;max-height:85vh;overflow:auto;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.35)");
+      box.appendChild(el("h2", "margin:0 0 12px;font-size:18px", "📅 " + (liste.length > 1 ? "Nei Rendez-vousen" : "Neie Rendez-vous")));
+      liste.forEach((r) => {
+        const k = el("div", "border:1px solid #c9d5cd;border-radius:10px;padding:10px 12px;margin-bottom:10px");
+        k.appendChild(el("div", "font-weight:700;font-size:15px", r.Typ || "Rendez-vous"));
+        k.appendChild(el("div", "font-size:15px;margin-top:2px", wochentag(r.Datum) + r.Datum + (r.Zäit ? ", " + r.Zäit + " Auer" : "")));
+        if (r.Notiz) k.appendChild(el("div", "font-size:13px;color:#4a5a50;margin-top:4px;white-space:pre-wrap", r.Notiz));
+        box.appendChild(k);
+      });
+      const knapp = el("button", "width:100%;padding:10px;border:0;border-radius:8px;background:#2e7d4f;color:#fff;font-size:15px;font-weight:700;cursor:pointer;" + FONT, "Gesinn");
+      knapp.setAttribute("type", "button");
+      knapp.onclick = () => {
+        overlay.remove();
+        fetch(API, {
+          method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ typ: "rendezvousGesinn", token, rendezvousen: liste.map((r) => ({ ID: r.ID, Stand: r.Stand })) }),
+        }).catch(() => {});
+      };
+      box.appendChild(knapp);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+    }
+    const start = () => {
+      fetch(API + "?version=1").then((r) => r.json()).then((v) => {
+        if (!v || !v.ok || !(v.features || []).includes("rendezvousNeu")) return null;
+        return fetch(API + "?rendezvousNeu=1&token=" + encodeURIComponent(token)).then((r) => r.json());
+      }).then((d) => {
+        if (d && d.ok && Array.isArray(d.rendezvousen) && d.rendezvousen.length) weisen(d.rendezvousen);
+      }).catch(() => {});
+    };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
+  }
+  try { fügRendezvousPopupBäi(); } catch (e) { /* ni d'Säit blockéieren */ }
   try { fügGlackBäi(); } catch (e) { /* d'Glack däerf ni d'Säit oder d'Session-Kontroll blockéieren */ }
 
   // Anonym-Modus 🕶 (NËMMEN Proffen): fir d'Tool virzeweisen (Fortbildung, Beamer),
