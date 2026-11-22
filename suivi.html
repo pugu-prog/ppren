@@ -419,13 +419,17 @@ function App() {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
-      // Backend gëtt éischt d'Google-Docs-PDF (falscht Deckblat) a mellt en LaTeX-Optrag. Mir rechnen en HEI direkt
-      // am Browser (selwechte Code wéi Dashboard: ppren-latex.js) a weisen de Link ERST duerno.
       const L = window.PprenLatex;
-      if (!L || !(await L.backendKann(WEB_APP_URL))) throw new Error("LaTeX am Browser net méiglech (Browser ze al oder Backend ouni latexBrowser). D'PDF ass nach d'Docs-Fassung mat falschem Deckblat – net benotzen.");
-      const r = await L.optraegErneieren({ webAppUrl: WEB_APP_URL, token: window.PPREN_SESSION?.token || "", onStatus: setLatexMeldung });
-      if (!r || r.feeler > 0 || r.fertig === 0) throw new Error("LaTeX-PDF ass net fäerdeg ginn (" + (r ? r.feeler + " Feeler, " + r.fertig + " fäerdeg" : "keen Resultat") + "). D'PDF ass nach d'Docs-Fassung mat falschem Deckblat – net benotzen. Grond am Blat LatexOptraeg.");
-      setProjekt((p) => (p ? { ...p, "Suivi-PDF-Link (Schüler)": data.url } : p));
+      if (!L || !L.unterstuetzt) throw new Error("Dësen Browser kann kee LaTeX (WebAssembly). Kee PDF erstallt – am Chrome/Safari nei probéieren.");
+      if (!data.tex) throw new Error("Backend ze al (liwwert keen LaTeX-Quelltext). Kee PDF erstallt.");
+      setLatexMeldung("LaTeX-PDF gëtt gerechent …");
+      const pdfBlob = await L.pdf(data.tex);
+      const pdfBase64 = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(pdfBlob); });
+      const up = await (await fetch(WEB_APP_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ typ: "latexPdfDirekt", token: window.PPREN_SESSION?.token || "", schueler: currentSchueler.name, typ: "Suivi", pdfBase64 }) })).json();
+      if (!up.ok) throw new Error(up.error || "PDF-Upload feelgeschloen");
+      const pdfUrl = up.url;
+      setProjekt((p) => (p ? { ...p, "Suivi-PDF-Link (Schüler)": pdfUrl } : p));
       alert("Suivi-PDF mat LaTeX-Deckblat ass fäerdeg." + (referenzPdfs.length ? " D'Referenzfassung steet nieft dem Link." : ""));
     } catch (e) {
       alert("Konnte de Suivi-PDF net generéieren: " + e.message);
@@ -652,7 +656,7 @@ function App() {
               )}
 
               <div className="link-row">
-                {projekt?.["Projektplan-Link"] && (
+                {projekt?.["Projektplan-Link"] && !(istSchueler && referenzPdfs.length > 0) && (
                   <a className="btn btn-ghost" href={projekt["Projektplan-Link"]} rel="noreferrer">📝 Projektplan als Word öffnen</a>
                 )}
                 {projekt?.["Dokumentatioun-Link"] && (
