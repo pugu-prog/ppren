@@ -426,7 +426,7 @@ function App() {
       const pdfBlob = await L.pdf(data.tex);
       const pdfBase64 = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(pdfBlob); });
       const up = await (await fetch(WEB_APP_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ typ: "latexPdfDirekt", token: window.PPREN_SESSION?.token || "", schueler: currentSchueler.name, typ: "Suivi", pdfBase64 }) })).json();
+        body: JSON.stringify({ typ: "latexPdfDirekt", token: window.PPREN_SESSION?.token || "", schueler: currentSchueler.name, dokument: "Suivi", pdfBase64 }) })).json();
       if (!up.ok) throw new Error(up.error || "PDF-Upload feelgeschloen");
       const pdfUrl = up.url;
       setProjekt((p) => (p ? { ...p, "Suivi-PDF-Link (Schüler)": pdfUrl } : p));
