@@ -673,6 +673,17 @@ function App() {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
+      const L = window.PprenLatex;
+      if (!L || !L.unterstuetzt) throw new Error("Dësen Browser kann kee LaTeX (WebAssembly). Kee PDF erstallt – am Chrome/Safari nei probéieren.");
+      if (!data.tex) throw new Error("Backend ze al (liwwert keen LaTeX-Quelltext). Kee PDF erstallt.");
+      setLatexStatus("LaTeX-PDF gëtt gerechent …");
+      const pdfBlob = await L.pdf(data.tex);
+      const pdfBase64 = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(pdfBlob); });
+      const up = await (await fetch(WEB_APP_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ typ: "latexPdfDirekt", token: window.PPREN_SESSION?.token || "", schueler: schueler, dokument: "Suivi", pdfBase64 }) })).json();
+      if (!up.ok) throw new Error(up.error || "PDF-Upload feelgeschloen");
+      const pdfUrl = up.url;
+      data.url = pdfUrl; setLatexStatus(null);
       setProjekte((ps) => ps.map((p) => (p.Schüler === schueler ? { ...p, "Suivi-PDF-Link (Schüler)": data.url } : p)));
       setBewertungen((bs) => bs.map((b) => (b.Schüler === schueler ? { ...b, "Suivi-PDF-Link (Schüler)": data.url } : b)));
     } catch (e) {

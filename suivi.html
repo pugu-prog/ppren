@@ -7,6 +7,7 @@
 <title>PPREN Mäin Suivi</title>
 <script src="auth-guard.js"></script>
 <script src="wochenberichte-luecken.js"></script>
+<script src="../ppren-latex/ppren-latex.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -352,6 +353,7 @@ function App() {
   const [error, setError] = useState(null);
   const [geladen, setGeladen] = useState(false);
   const [suiviPdfGenerating, setSuiviPdfGenerating] = useState(false);
+  const [latexMeldung, setLatexMeldung] = useState("");
   const [wbOffenId, setWbOffenId] = useState(null);
   const [rasterVunBackend, setRasterVunBackend] = useState(null);
 
@@ -381,7 +383,7 @@ function App() {
         setAusgaben((data.ausgaben || []).filter((a) => a.Schüler === currentSchueler.name));
         setRendezvousen((data.rendezvousen || []).filter((r) => r.Schüler === currentSchueler.name));
         // Referenzfassung vum Projektplang (vum Prof eropgeluede PDF, Dateinumm fänkt mat "Referenz" un)
-        setReferenzPdfs((data.plangFeedbackPdfs || []).filter((f) => f.Schüler === currentSchueler.name && /^referenz/i.test(String(f.Dateiname || ""))));
+        setReferenzPdfs((data.plangFeedbackPdfs || []).filter((f) => f.Schüler === currentSchueler.name && /^referenz/i.test(String(f.Dateiname || "")) && (!istSchueler || !/lehrer/i.test(String(f.Dateiname || "")))));
 
         let gespäichert = [];
         const eintrag = (data.meilensteng || []).find((m) => m.Schüler === currentSchueler.name);
@@ -417,10 +419,22 @@ function App() {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Onbekannte Feeler");
-      setProjekt((p) => (p ? { ...p, "Suivi-PDF-Link (Schüler)": data.url } : p));
+      const L = window.PprenLatex;
+      if (!L || !L.unterstuetzt) throw new Error("Dësen Browser kann kee LaTeX (WebAssembly). Kee PDF erstallt – am Chrome/Safari nei probéieren.");
+      if (!data.tex) throw new Error("Backend ze al (liwwert keen LaTeX-Quelltext). Kee PDF erstallt.");
+      setLatexMeldung("LaTeX-PDF gëtt gerechent …");
+      const pdfBlob = await L.pdf(data.tex);
+      const pdfBase64 = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(pdfBlob); });
+      const up = await (await fetch(WEB_APP_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ typ: "latexPdfDirekt", token: window.PPREN_SESSION?.token || "", schueler: currentSchueler.name, dokument: "Suivi", pdfBase64 }) })).json();
+      if (!up.ok) throw new Error(up.error || "PDF-Upload feelgeschloen");
+      const pdfUrl = up.url;
+      setProjekt((p) => (p ? { ...p, "Suivi-PDF-Link (Schüler)": pdfUrl } : p));
+      alert("Suivi-PDF mat LaTeX-Deckblat ass fäerdeg." + (referenzPdfs.length ? " D'Referenzfassung steet nieft dem Link." : ""));
     } catch (e) {
       alert("Konnte de Suivi-PDF net generéieren: " + e.message);
     } finally {
+      setLatexMeldung("");
       setSuiviPdfGenerating(false);
     }
   };
@@ -642,14 +656,21 @@ function App() {
               )}
 
               <div className="link-row">
-                {projekt?.["Projektplan-Link"] && (
+                {projekt?.["Projektplan-Link"] && !(istSchueler && referenzPdfs.length > 0) && (
                   <a className="btn btn-ghost" href={projekt["Projektplan-Link"]} rel="noreferrer">📝 Projektplan als Word öffnen</a>
                 )}
                 {projekt?.["Dokumentatioun-Link"] && (
                   <a className="btn btn-ghost" href={projekt["Dokumentatioun-Link"]} rel="noreferrer">🔗 Dokumentatioun opmaachen</a>
                 )}
                 {projekt?.["Suivi-PDF-Link (Schüler)"] && (
-                  <a className="btn btn-ghost" href={projekt["Suivi-PDF-Link (Schüler)"]} rel="noreferrer">📄 Suivi als PDF opmaachen</a>
+                  <a className="btn btn-ghost" href={projekt["Suivi-PDF-Link (Schüler)"]} target="_blank" rel="noreferrer"
+                    onClick={() => { referenzPdfs.slice(-1).forEach((f) => window.open(f.Link, "_blank", "noopener")); }}>📄 Suivi als PDF opmaachen{referenzPdfs.length ? " (+ Referenzfassung)" : ""}</a>
+                )}
+                {projekt?.["Suivi-PDF-Link (Schüler)"] && referenzPdfs.slice(-1).map((f) => (
+                  <a key={f.ID} className="btn btn-ghost" href={f.Link} target="_blank" rel="noreferrer">📌 Referenzfassung</a>
+                ))}
+                {suiviPdfGenerating && latexMeldung && (
+                  <span className="feld-text">{latexMeldung}</span>
                 )}
                 {!istSchueler && projekt && (
                   <button type="button" className="btn btn-ghost" disabled={suiviPdfGenerating} onClick={suiviPdfGeneréieren}>
